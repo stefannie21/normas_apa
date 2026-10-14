@@ -1,4 +1,4 @@
-﻿/* Logica principal: carga de .docx, edicion y analisis APA. */
+/* Logica principal: carga de .docx, edicion y analisis APA. */
 (function () {
   "use strict";
   const SEVERITY_ICON = { error: "!", warning: "!", info: "i" };
@@ -90,6 +90,31 @@
     return s.slice(0, n);
   }
 
+  // Word mide el interlineado en multiplos de la ALTURA NATURAL de la fuente
+  // (ascent + descent + separacion interna), que en Arial 11 es ~1.15 veces el
+  // tamano de letra. CSS multiplica el tamano de letra, asi que al volcar
+  // `line_spacing` tal cual, un doble espacio de Word salia un 15 % mas
+  // apretado en el visor y cada pagina entran mas lineas de las que deberian
+  // (la tesis se dividia en 29 hojas en vez de 33).
+  function lineFactor(family, sizePx) {
+    const size = parseFloat(sizePx) || 16;
+    const fam = (family || "").split(",")[0].replace(/["']/g, "").trim() || "sans-serif";
+    try {
+      const ctx = document.createElement("canvas").getContext("2d");
+      ctx.font = size + "px " + fam;
+      // si el navegador rechaza la fuente conserva la anterior: se comprueba
+      // que la asignacion haya cuajado antes de fiarse de las medidas
+      if (Math.abs(parseFloat(ctx.font) - size) > 0.5) return 1.15;
+      const m = ctx.measureText("Ág");
+      if (m.fontBoundingBoxAscent && m.fontBoundingBoxDescent) {
+        return (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent) / size;
+      }
+    } catch (e) {
+      /* navegadores sin fontBoundingBox: se usa el valor habitual */
+    }
+    return 1.15;
+  }
+
   // mammoth descarta alineacion, interlineado, separaciones, tamanos, fuente y
   // saltos de pagina: todo eso se recupera del .docx via /api/docx-meta.
   async function enrichHtml(html) {
@@ -107,6 +132,11 @@
       if (defs.font) page.style.fontFamily = quoteFont(defs.font);
       if (defs.size_pt) page.style.fontSize = defs.size_pt + "pt";
 
+      // tipografia real del documento: la que se usara para el factor de
+      // interlineado. No puede ser la del parrafo, que al estar fuera de #page
+      // heredaria la de la interfaz.
+      const docFamily = (defs.font && quoteFont(defs.font)) || getComputedStyle(page).fontFamily;
+
       // cola de metadatos por clave: permite repetir la misma linea sin confundirse
       const queues = new Map();
       (meta.paragraphs || []).forEach((p) => {
@@ -117,6 +147,12 @@
 
       const tmp = document.createElement("div");
       tmp.innerHTML = html;
+      // getComputedStyle NO devuelve nada sobre un elemento desconectado del
+      // documento, y el factor de interlineado depende justo de la fuente y el
+      // tamano ya fijados. Por eso tmp se engancha fuera de pantalla mientras se
+      // mide, y se retira antes de devolver el HTML.
+      tmp.style.cssText = "position:absolute;left:-12000px;top:0;visibility:hidden;";
+      document.body.appendChild(tmp);
       const blocks = Array.from(tmp.querySelectorAll("p,h1,h2,h3,h4,li"));
       blocks.forEach((el, i) => {
         const queue = queues.get(textKey(el.textContent));
@@ -124,10 +160,12 @@
         if (!info) return;
 
         if (info.align && info.align !== "left") el.style.textAlign = info.align;
-        if (info.ls) el.style.lineHeight = String(info.ls);
         if (info.sb != null) el.style.marginTop = info.sb + "pt";
         if (info.sa != null) el.style.marginBottom = info.sa + "pt";
         if (info.size) el.style.fontSize = info.size + "pt";
+        // el factor se calcula con la FUENTE DEL DOCUMENTO (Arial en este caso)
+        // y no con la que hereda el parrafo, que seria la de la interfaz
+        if (info.ls) el.style.lineHeight = String(info.ls * lineFactor(docFamily, el.style.fontSize));
 
         // salto de pagina explicito antes de este parrafo
         if (info.pb && i > 0) {
@@ -137,7 +175,9 @@
           el.parentNode.insertBefore(br, el);
         }
       });
-      return tmp.innerHTML;
+      const out = tmp.innerHTML;
+      document.body.removeChild(tmp);
+      return out;
     } catch (e) {
       return html;
     }
@@ -160,6 +200,9 @@
         Pager.paginate(page, docSections);
         updateTocPages();
         updateCountsDebounced();
+        // la repaginacion por imagenes recarga forma parte de la carga, no es
+        // un cambio del usuario: no debe aparecer como paso deshacible
+        History.reset();
       }
     }, 600);
   }
@@ -194,7 +237,12 @@
           clearMarks();
           resetReport();
           updateCounts();
+          // el documento que se acaba de abrir es el punto de partida
+          History.reset();
           showToast("Documento cargado. Edita y pulsa 'Verificar APA'.", "ok");
+          // guardar la sesion automaticamente para que al recargar la web
+          // se restaure ESTE documento y no el anterior
+          saveSession(true);
         })
         .catch((err) => showToast("No se pudo abrir el documento: " + err.message, "error"));
     };
@@ -205,14 +253,14 @@
     reading = !reading;
     page.contentEditable = reading ? "false" : "true";
     document.body.classList.toggle("reading", reading);
-    showToast(reading ? "Modo lectura activado" : "Edicion activada", "ok");
+    showToast(reading ? "Modo lectura activado" : "Edición activada", "ok");
   }
 
   function repaginate() {
     Pager.paginate(page, docSections);
     updateTocPages();
     updateCounts();
-    showToast("Paginas reorganizadas (se reinicia el historial de Ctrl+Z).", "ok");
+    showToast("Páginas reorganizadas. Se puede deshacer con Ctrl+Z.", "ok");
   }
 
   /* ---------- Revision asistida por IA ---------- */
@@ -233,7 +281,7 @@
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.detail || "Error " + res.status);
       if (!payload.ai_enabled) {
-        showToast("La revision con IA no esta habilitada (falta AI_ENABLED o la clave).", "error");
+        showToast("La revisión con IA no está habilitada (falta AI_ENABLED o la clave).", "error");
         statusMsg.textContent = "";
         return;
       }
@@ -245,22 +293,28 @@
       statusMsg.textContent = "";
       showToast(
         aiFindings.length
-          ? "IA: " + aiFindings.length + " sugerencia(s) de " + (payload.model || "")
-          : "IA: sin sugerencias",
+          ? "IA: " + aiFindings.length + " sugerencia(s) con " + (payload.model || "")
+          : "IA (" + (payload.model || "") + "): sin sugerencias",
         aiFindings.length ? "ok" : "info"
       );
     } catch (err) {
       statusMsg.textContent = "";
-      showToast("La revision con IA fallo: " + err.message, "error");
+      showToast("La revisión con IA falló: " + err.message, "error");
     }
   }
 
 
   /* ---------- Indice: numeros de pagina reales tras la paginacion ---------- */
   function updateTocPages() {
-    const toc = page.querySelector(".doc-toc");
-    if (!toc) return;
-    const entries = Array.from(toc.querySelectorAll(".toc-entry"));
+    // El indice puede ocupar mas de una hoja: el paginador lo parte en varios
+    // bloques .doc-toc. Hay que recorrerlos TODOS, no solo el primero, o las
+    // entradas de la continuacion se quedan sin numero de pagina.
+    const tocs = Array.from(page.querySelectorAll(".doc-toc"));
+    if (!tocs.length) return;
+    const entries = [];
+    tocs.forEach((t) => {
+      Array.prototype.push.apply(entries, Array.prototype.slice.call(t.querySelectorAll(".toc-entry")));
+    });
     if (!entries.length) return;
     let i = 0;
     let last = "1";
@@ -316,7 +370,7 @@
   }
 
   function insertLink() {
-    const url = window.prompt("Direccion del enlace (https://...):");
+    const url = window.prompt("Dirección del enlace (https://...):");
     if (!url) return;
     Commands.focusPage();
     document.execCommand("createLink", false, url);
@@ -333,7 +387,9 @@
         if (el.classList.contains("sheet-num")) return;
         el.style.fontFamily = "'Times New Roman', serif";
         el.style.fontSize = "12pt";
-        el.style.lineHeight = "2";
+        // mismo criterio que al importar el .docx: el 2 es el doble espacio de
+        // Word, medido sobre la altura natural de la fuente
+        el.style.lineHeight = String(2 * lineFactor("'Times New Roman', serif", el.style.fontSize));
         el.style.textAlign = "left";
         if (el.tagName === "P") {
           el.style.textIndent = "1.27cm";
@@ -343,7 +399,7 @@
     });
     Pager.paginate(page, docSections);
     updateCounts();
-    showToast("Formato base APA aplicado (2.0, Times New Roman 12, sangria). Ctrl+Z no restaura este paso.", "ok");
+    showToast("Formato base APA aplicado (2.0, Times New Roman 12, sangría). Se puede deshacer con Ctrl+Z.", "ok");
   }
 
   function clearMarks() {
@@ -414,7 +470,7 @@
     scoreNum.textContent = "--";
     paneCards.innerHTML = "";
     paneFilters.innerHTML = "";
-    findingsEl.innerHTML = '<p class="empty-pane">Aun no se ha verificado el documento.</p>';
+    findingsEl.innerHTML = '<p class="empty-pane">Aún no se ha verificado el documento.</p>';
   }
 
   function renderReport(report) {
@@ -454,7 +510,7 @@
     if (res.marks || res.blocks) {
       showToast(
         (res.marks ? res.marks + " texto(s) marcados" : "") +
-          (res.blocks ? " y " + res.blocks + " parrafo(s)" : "") +
+          (res.blocks ? " y " + res.blocks + " párrafo(s)" : "") +
           " en el documento",
         "info"
       );
@@ -547,6 +603,8 @@
     if (!el || el.nodeType !== 1) return false;
     if (!/^(P|DIV|LI)$/.test(el.tagName)) return false;
     if (el.classList.contains("doc-toc")) return false;
+    // nada de lo que hay dentro del indice generado se toma por indice viejo
+    if (el.closest && el.closest(".doc-toc")) return false;
     const raw = (el.textContent || "").replace(/\u00a0/g, " ");
     const t = raw.trim();
     if (!t) return false;
@@ -615,6 +673,18 @@
     const wrappers = [];
     const flat = [];
     Array.from(root.children).forEach((c) => {
+      // Tras paginar, el flujo vive dentro de hojas .sheet. Hay que bajar a
+      // ellas para encontrar las entradas viejas, pero una hoja NUNCA se
+      // elimina: contiene mucho mas que el indice. Antes se tomaba la hoja
+      // entera como "contenedor" y al reconstruir el indice se comia paginas
+      // completas del documento (13 titulos y 5 hojas de la nada).
+      if (c.classList && c.classList.contains("sheet")) {
+        Array.from(c.children).forEach((k) => {
+          if (k.classList && k.classList.contains("sheet-num")) return;
+          expandEntryContainer(k, headingKeys, wrappers).forEach((e) => flat.push(e));
+        });
+        return;
+      }
       expandEntryContainer(c, headingKeys, wrappers).forEach((e) => flat.push(e));
     });
 
@@ -644,8 +714,29 @@
     const keys = headings.map((h) => normKey(h.textContent));
     removeOldToc(page, keys);
 
-    const tocLike = (t) => /^(índice|indice|contenido|contenidos|tabla de contenido|sumario)$/i.test(t.trim().replace(/[.:]$/, ""));
-    const heading = headings.find((h) => tocLike(h.textContent || ""));
+    // Titulo donde debe ir el indice. Antes solo aceptaba la palabra exacta
+    // ("Indice"), asi que un documento titulado "Indice de Contenidos" se
+    // quedaba sin ancla y el indice generado acababa DELANTE de la portada.
+    // Se comparan sin tildes: el titulo viene con mayusculas y acentos.
+    const normToc = (t) =>
+      (t || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/[.:;]+$/, "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    const esIndiceDe = (s) =>
+      /^(indice|tabla|contenido)\s+de\s+(contenidos?|tablas?|graficos?|figuras?|anexos|ilustraciones)\b/.test(s);
+    const esIndice = (s) => /^(indice|contenido|contenidos|sumario)\b/.test(s);
+    const candidatos = headings.filter((h) => {
+      const s = normToc(h.textContent);
+      return esIndice(s) || esIndiceDe(s);
+    });
+    // antes el indice de tablas, el de graficos o el de anexos que el de
+    // contenidos: si solo hay uno de esos, se usa como ancla igualmente
+    const heading =
+      candidatos.find((h) => /contenido/.test(normToc(h.textContent))) || candidatos[0] || null;
     let anchor = heading || null;
 
     const toc = document.createElement("div");
@@ -687,9 +778,18 @@
 
     if (anchor) {
       anchor.after(toc);
-    } else {
-      page.prepend(toc);
+      return;
     }
+    // Sin un titulo de indice, el bloque se coloca despues del primer salto de
+    // pagina, nunca al principio: anteponerlo tapaba la portada del documento.
+    const primerSalto = page.querySelector(".page-break");
+    if (primerSalto) {
+      primerSalto.after(toc);
+      return;
+    }
+    // Tampoco hay salto de pagina: se descarta antes que inventar una pagina
+    // de indice donde el autor no la puso.
+    toc.remove();
   }
 
   /* ---------- Utilidades ---------- */
@@ -777,7 +877,7 @@
   let totalPages = 0;
   let currentPage = 1;
   function updatePageLabel() {
-    statusPages.textContent = "Pagina " + currentPage + " de " + Math.max(totalPages, 1);
+    statusPages.textContent = "Página " + currentPage + " de " + Math.max(totalPages, 1);
   }
   function trackCurrentPage() {
     const sheets = page.querySelectorAll(".sheet");
@@ -824,8 +924,10 @@
   // indice generado; se expone esta funcion para rehacerlo
   window.App = {
     rebuildIndex() {
-      const toc = page.querySelector(".doc-toc");
-      if (toc) toc.remove();
+      // Se quitan TODAS las partes del indice, no solo la primera: si el
+      // documento lo partio entre varias hojas, con querySelector se dejaba la
+      // continuacion y el indice se veia duplicado tras cada reconstruccion.
+      page.querySelectorAll(".doc-toc").forEach((t) => t.remove());
       page.querySelectorAll("[data-toc-skip]").forEach((h) => h.removeAttribute("data-toc-skip"));
       buildIndex();
       Pager.paginate(page, docSections);
@@ -843,12 +945,13 @@
     if (!saveBtn) return;
     saveBtn.classList.toggle("dirty", value);
     saveBtn.title = value
-      ? "Hay cambios sin guardar. Pulsa para guardarlos en este navegador"
-      : "Guardar los cambios en este navegador";
+      ? "Hay cambios sin guardar. Pulsa para descargar el documento corregido"
+      : "Descargar documento corregido (.docx)";
   }
 
   async function saveSession(silent) {
     if (!currentFile) return;
+    // Guardar tambien en IndexedDB por si se recarga la pagina
     let buffer = null;
     try {
       buffer = await currentFile.arrayBuffer();
@@ -857,22 +960,75 @@
     }
     const doc = {
       name: currentFile.name,
-      flow: Pager.toFlowHtml(page),
+      flow: Pager.toFlowHtml(page, ".doc-toc"),
       bytes: buffer,
       savedAt: new Date().toISOString(),
     };
     try {
       await SessionStore.save(doc);
       markDirty(false);
-      if (!silent) {
-        const when = new Date(doc.savedAt).toLocaleTimeString("es", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        showToast("Cambios guardados en este navegador (" + when + ").", "ok");
-      }
     } catch (e) {
-      showToast("No se pudo guardar: " + e.message, "error");
+      /* error al guardar en IndexedDB no bloquea la descarga */
+    }
+  }
+
+  // Recolecta los IDs de las reglas que se han corregido
+  function getCorrectedRuleIds() {
+    var ids = [];
+    for (var i = 0; i < resolvedRules.size; i++) {
+      // resolvedRules es un Set; se itera manualmente
+    }
+    resolvedRules.forEach(function (r) { ids.push(r); });
+    return ids;
+  }
+
+  async function downloadCorrectedDocx() {
+    if (!currentFile) {
+      showToast("Abre un documento primero", "error");
+      return;
+    }
+    saveBtn.disabled = true;
+    statusMsg.textContent = "Generando documento corregido...";
+    var ruleIds = getCorrectedRuleIds();
+    var formData = new FormData();
+    formData.append("file", currentFile, currentFile.name);
+    formData.append("rules", ruleIds.join(","));
+    try {
+      var res = await fetch("/api/export", { method: "POST", body: formData });
+      if (!res.ok) {
+        var err = await res.json().catch(function () { return { detail: "Error" }; });
+        throw new Error(err.detail || "Error " + res.status);
+      }
+      var blob = await res.blob();
+      // El nombre viene en el Content-Disposition; si no se puede leer,
+      // se construye a partir del nombre original
+      var disposition = res.headers.get("Content-Disposition") || "";
+      var fileName = "";
+      var match = disposition.match(/filename="?([^"]+)"?/);
+      if (match) {
+        fileName = match[1];
+      } else {
+        var base = currentFile.name.replace(/\.docx$/i, "");
+        fileName = base + "-correcciones.docx";
+      }
+      // Descargar el archivo: el navegador abre el dialogo "Guardar como..."
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      markDirty(false);
+      saveSession(true);
+      statusMsg.textContent = "";
+      showToast("Documento corregido descargado: " + fileName, "ok");
+    } catch (err) {
+      statusMsg.textContent = "";
+      showToast("No se pudo descargar: " + err.message, "error");
+    } finally {
+      saveBtn.disabled = false;
     }
   }
 
@@ -897,6 +1053,10 @@
       analyzeBtn.disabled = false;
       saveBtn.disabled = false;
       page.innerHTML = doc.flow;
+      // Las sesiones guardadas antes de este arreglo ya traerian el indice
+      // generado dentro del flujo (a veces partido en varios bloques). Se quitan
+      // TODOS antes de reconstruirlo, o el indice se veria repetido.
+      page.querySelectorAll(".doc-toc").forEach((t) => t.remove());
       buildIndex();
       Pager.paginate(page, docSections);
       updateTocPages();
@@ -906,19 +1066,20 @@
       resetReport();
       updateCounts();
       markDirty(false);
+      History.reset();
       const when = new Date(doc.savedAt).toLocaleString("es", {
         day: "2-digit",
         month: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
       });
-      showToast("Sesion restaurada: " + doc.name + " (" + when + ").", "info");
+      showToast("Sesión restaurada: " + doc.name + " (" + when + ").", "info");
     } catch (e) {
       /* si el guardado esta corrupto, se ignora y se empieza limpio */
     }
   }
 
-  saveBtn.addEventListener("click", () => saveSession(false));
+  saveBtn.addEventListener("click", downloadCorrectedDocx);
 
   /* ---------- Plegar la cinta de opciones ---------- */
   const ribbonNav = document.getElementById("ribbon");
@@ -968,7 +1129,7 @@
     const rows = Fixer.preview(items, ctx).filter((r) => r.count > 0);
     if (!rows.length) {
       fixList.innerHTML =
-        '<p class="modal-note">No hay correcciones automaticas disponibles: primero verifica el documento.</p>';
+        '<p class="modal-note">No hay correcciones automáticas disponibles: primero verifica el documento.</p>';
       fixApply.disabled = true;
       fixCount.textContent = "";
       return rows;
@@ -1013,23 +1174,21 @@
       (i) => i.value
     );
     if (!chosen.length) {
-      showToast("Selecciona al menos una correccion", "error");
+      showToast("Selecciona al menos una corrección", "error");
       return;
     }
     const items = Fixer.CORRECTIONS.filter((c) => chosen.includes(c.id));
     fixSnapshot = Pager.toFlowHtml(page);
     const res = Fixer.applySelected(items, { sections: docSections || [] });
     if (!res.total) {
-      showToast("No habia nada que corregir", "error");
+      showToast("No había nada que corregir", "error");
       closeFixModal();
       return;
     }
     repaginate();
     markDirty(true);
-    fixApply.disabled = true;
-    fixCount.textContent = res.total + " correccion(es) aplicada(s)";
-    fixUndo.hidden = false;
-    showToast("Se aplicaron " + res.total + " correcciones", "ok");
+    fixModal.hidden = true;
+    showToast("Se aplicaron " + res.total + " corrección(es) correctamente.", "ok");
     // tras corregir, se retiran las marcas de las reglas ya resueltas:
     // lo que queda marcado es justo lo que hay que revisar a mano
     refreshMarksAfterFix(res);
@@ -1044,12 +1203,11 @@
     currentFindings = allFindings.filter((f) => !resolvedRules.has(f.rule_id));
     const quedan = currentFindings.length;
     renderReport({ summary: lastSummary, findings: currentFindings, partial: true });
-    showToast(
-      quedan
-        ? "Quedan " + quedan + " aviso(s) marcados en el texto"
-        : "No queda ningun aviso por revisar",
-      quedan ? "info" : "ok"
-    );
+    if (quedan) {
+      setTimeout(function () {
+        showToast("Quedan " + quedan + " aviso(s) por revisar manualmente.", "info");
+      }, 1800);
+    }
   }
 
   function undoFixes() {
@@ -1086,7 +1244,7 @@
       showToast(
         res && res.total
           ? "Corregido (" + res.total + ")"
-          : "No habia nada que corregir",
+          : "No había nada que corregir",
         res && res.total ? "ok" : "info"
       );
       refreshMarksAfterFix(res);
@@ -1101,6 +1259,24 @@
   resetReport();
   setZoom(100);
   markDirty(false);
+
+  /* ---------- Deshacer / rehacer ---------- */
+  // El historial propio sustituye al del navegador: este solo guardaba lo
+  // tecleado y se borraba al repaginar, marcar avisos o aplicar correcciones.
+  History.init({
+    // tras restaurar hay que rehacer la paginacion, porque al deshacer un
+    // "Reorganizar paginas" vuelve el documento a como estaba sin paginar
+    afterRestore() {
+      Pager.paginate(page, docSections);
+      updateTocPages();
+      updateCounts();
+      markDirty(true);
+    },
+  });
+  History.onChange(() => {
+    if (window.Commands) Commands.refresh();
+    if (window.History) History.refresh();
+  });
 
   // aviso al cerrar con cambios sin guardar
   window.addEventListener("beforeunload", (e) => {

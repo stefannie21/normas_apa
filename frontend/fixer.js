@@ -132,8 +132,8 @@ que se pueden aplicar con certeza y deshacer.
     },
     {
       id: "espacios",
-      label: "Quitar espacio entre parrafos",
-      detail: "Deja 0 pt de espacio antes y despues de cada parrafo.",
+      label: "Quitar espacio entre párrafos",
+      detail: "Deja 0 pt de espacio antes y después de cada párrafo.",
       rules: ["FORMAT-007"],
       apply() {
         let n = 0;
@@ -149,8 +149,8 @@ que se pueden aplicar con certeza y deshacer.
     },
     {
       id: "sangria",
-      label: "Sangria de primera linea (1.27 cm)",
-      detail: "Aplica sangria de 0.5 pulgadas a los parrafos del cuerpo.",
+      label: "Sangría de primera línea (1.27 cm)",
+      detail: "Aplica sangría de 0.5 pulgadas a los párrafos del cuerpo.",
       rules: ["FORMAT-006"],
       apply() {
         let n = 0;
@@ -169,7 +169,7 @@ que se pueden aplicar con certeza y deshacer.
     {
       id: "alineacion",
       label: "Alinear a la izquierda",
-      detail: "Quita la justificacion y alinea a la izquierda (regla APA).",
+      detail: "Quita la justificación y alinea a la izquierda (regla APA).",
       rules: ["FORMAT-005"],
       apply() {
         let n = 0;
@@ -184,8 +184,8 @@ que se pueden aplicar con certeza y deshacer.
     },
     {
       id: "margenes",
-      label: "Margenes de 2.54 cm",
-      detail: "Ajusta los margenes de cada hoja a 1 pulgada.",
+      label: "Márgenes de 2.54 cm",
+      detail: "Ajusta los márgenes de cada hoja a 1 pulgada.",
       rules: ["FORMAT-001"],
       apply(ctx) {
         let n = 0;
@@ -209,7 +209,7 @@ que se pueden aplicar con certeza y deshacer.
     {
       id: "et-al",
       label: "Corregir 'et al.'",
-      detail: "Anade el punto final en las citas con 'et al'.",
+      detail: "Añade el punto final en las citas con 'et al'.",
       rules: ["CIT-003"],
       apply() {
         let n = 0;
@@ -231,7 +231,7 @@ que se pueden aplicar con certeza y deshacer.
     {
       id: "ampersand",
       label: "Usar '&' dentro de las citas",
-      detail: "Sustituye 'and' o 'y' por '&' dentro de los parentesis de cita.",
+      detail: "Sustituye 'and' o 'y' por '&' dentro de los paréntesis de cita.",
       rules: ["CIT-002"],
       apply() {
         let n = 0;
@@ -255,8 +255,8 @@ que se pueden aplicar con certeza y deshacer.
     },
     {
       id: "refs-sangria",
-      label: "Sangria francesa en las referencias",
-      detail: "Aplica la sangria francesa de 1.27 cm a cada referencia.",
+      label: "Sangría francesa en las referencias",
+      detail: "Aplica la sangría francesa de 1.27 cm a cada referencia.",
       rules: ["REF-002"],
       apply() {
         let n = 0;
@@ -272,7 +272,7 @@ que se pueden aplicar con certeza y deshacer.
     },
     {
       id: "refs-orden",
-      label: "Ordenar las referencias alfabeticamente",
+      label: "Ordenar las referencias alfabéticamente",
       detail: "Reordena la lista de referencias por el primer apellido.",
       rules: ["REF-003"],
 apply() {
@@ -306,7 +306,7 @@ apply() {
     {
       id: "refs-cursivas",
       label: "Cursivas en las referencias",
-      detail: "Cursiva el titulo (libros/tesis) o el contenedor (articulos).",
+      detail: "Cursiva el título (libros/tesis) o el contenedor (artículos).",
       rules: ["REF-006"],
       apply() {
         let n = 0;
@@ -327,7 +327,7 @@ apply() {
     },
     {
       id: "titulos-formato",
-      label: "Formato de los titulos por nivel",
+      label: "Formato de los títulos por nivel",
       detail: "Nivel 1 centrado y negrita; niveles 2 y 3 a la izquierda y en negrita (nivel 3 en cursiva).",
       rules: ["HEAD-002"],
       apply() {

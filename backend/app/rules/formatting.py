@@ -33,9 +33,9 @@ class MarginRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-001",
-            name="Margenes de 2.54 cm (1 in)",
+            name="Márgenes de 2.54 cm (1 in)",
             category=Category.FORMATO,
-            description="Todas las margenes de la pagina deben ser de 1 pulgada (2.54 cm).",
+            description="Todos los márgenes de la página deben ser de 1 pulgada (2.54 cm).",
             default_severity=Severity.ERROR,
         )
 
@@ -55,10 +55,10 @@ class MarginRule(Rule):
             if wrong:
                 findings.append(
                     self.finding(
-                        f"La seccion {section.index + 1} no tiene margenes APA (1 in). "
+                        f"La sección {section.index + 1} no tiene márgenes APA (1 in). "
                         f"Valores detectados: {', '.join(wrong)}.",
-                        location=f"Seccion {section.index + 1}",
-                        suggestion="Configurar 2.54 cm (1 in) en los cuatro margenes.",
+                        location=f"Sección {section.index + 1}",
+                        suggestion="Configurar 2.54 cm (1 in) en los cuatro márgenes.",
                     )
                 )
         return findings
@@ -68,7 +68,7 @@ class FontFamilyRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-002",
-            name="Tipografia permitida",
+            name="Tipografía permitida",
             category=Category.FORMATO,
             description="Usar una fuente aceptada por APA (p. ej. Times New Roman 12, Calibri 11, Arial 11).",
         )
@@ -84,7 +84,7 @@ class FontFamilyRule(Rule):
             self.finding(
                 f"Fuente no recomendada por APA: '{name}'.",
                 paragraph_index=p.index,
-                location=f"Parrafo {p.index + 1}",
+                location=f"Párrafo {p.index + 1}",
                 excerpt=p.excerpt(),
                 suggestion="Usar Times New Roman 12, Calibri 11, Arial 11, Georgia 11, Lucida Sans Unicode 10 o Computer Modern 10.",
             )
@@ -96,9 +96,9 @@ class FontSizeRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-003",
-            name="Tamano de fuente consistente",
+            name="Tamaño de fuente consistente",
             category=Category.FORMATO,
-            description="El cuerpo del texto debe usar un tamano de fuente APA consistente.",
+            description="El cuerpo del texto debe usar un tamaño de fuente APA consistente.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -124,22 +124,22 @@ class FontSizeRule(Rule):
             elif len(sizes) > 1:
                 findings.append(
                     self.finding(
-                        f"El parrafo mezcla varios tamanos de fuente: {sorted(sizes)} pt.",
+                        f"El párrafo mezcla varios tamaños de fuente: {sorted(sizes)} pt.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Unificar el tamano de fuente en todo el parrafo.",
+                        suggestion="Unificar el tamaño de fuente en todo el párrafo.",
                     )
                 )
         if out_of_range and first_bad is not None:
             findings.insert(
                 0,
                 self.finding(
-                    f"Tamano de fuente fuera de rango APA: {sorted(out_of_range)} pt.",
+                    f"Tamaño de fuente fuera de rango APA: {sorted(out_of_range)} pt.",
                     paragraph_index=first_bad.index,
-                    location=f"Parrafo {first_bad.index + 1}",
+                    location=f"Párrafo {first_bad.index + 1}",
                     excerpt=first_bad.excerpt(),
-                    suggestion="Usar 12 pt (o 11 pt segun la fuente) de forma consistente.",
+                    suggestion="Usar 12 pt (o 11 pt según la fuente) de forma consistente.",
                 ),
             )
         return findings
@@ -169,11 +169,11 @@ class LineSpacingRule(Rule):
             by_value.setdefault(key, p)
         return [
             self.finding(
-                f"Interlineado {value} en lugar de doble (2.0) en {self._count(document, value)} parrafo(s).",
+                f"Interlineado {value} en lugar de doble (2.0) en {self._count(document, value)} párrafo(s).",
                 paragraph_index=p.index,
-                location=f"Parrafo {p.index + 1}",
+                location=f"Párrafo {p.index + 1}",
                 excerpt=p.excerpt(),
-                suggestion="Aplicar interlineado doble (2.0) sin espacio adicional antes/despues.",
+                suggestion="Aplicar interlineado doble (2.0) sin espacio adicional antes/después.",
                 extra={"line_spacing": value},
             )
             for value, p in sorted(by_value.items())
@@ -192,7 +192,7 @@ class AlignmentRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-005",
-            name="Alineacion a la izquierda",
+            name="Alineación a la izquierda",
             category=Category.FORMATO,
             description="El texto debe alinearse a la izquierda (no justificado).",
         )
@@ -205,11 +205,11 @@ class AlignmentRule(Rule):
             if p.alignment in {"justify"}:
                 findings.append(
                     self.finding(
-                        f"Parrafo justificado; APA recomienda alinear a la izquierda.",
+                        f"Párrafo justificado; APA recomienda alinear a la izquierda.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Cambiar la alineacion a izquierda.",
+                        suggestion="Cambiar la alineación a izquierda.",
                     )
                 )
         return findings
@@ -219,9 +219,9 @@ class FirstLineIndentRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-006",
-            name="Sangria de primera linea",
+            name="Sangría de primera línea",
             category=Category.FORMATO,
-            description="La primera linea de cada parrafo del cuerpo debe tener sangria de 1.27 cm (0.5 in).",
+            description="La primera línea de cada párrafo del cuerpo debe tener sangría de 1.27 cm (0.5 in).",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -236,14 +236,14 @@ class FirstLineIndentRule(Rule):
                 continue
             indent = p.first_line_indent_in
             if indent is None or abs(indent - INDENT_IN) > INDENT_TOLERANCE_IN:
-                shown = f"{indent:.2f} in" if indent is not None else "sin sangria"
+                shown = f"{indent:.2f} in" if indent is not None else "sin sangría"
                 findings.append(
                     self.finding(
-                        f"Primera linea con sangria de {shown} en lugar de 0.5 in (1.27 cm).",
+                        f"Primera línea con sangría de {shown} en lugar de 0.5 in (1.27 cm).",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Aplicar sangria de primera linea de 1.27 cm en parrafos del cuerpo.",
+                        suggestion="Aplicar sangría de primera línea de 1.27 cm en párrafos del cuerpo.",
                     )
                 )
         return findings
@@ -253,9 +253,9 @@ class ParagraphSpacingRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-007",
-            name="Sin espacio extra entre parrafos",
+            name="Sin espacio extra entre párrafos",
             category=Category.FORMATO,
-            description="APA no usa espacio adicional antes o despues de los parrafos.",
+            description="APA no usa espacio adicional antes o después de los párrafos.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -284,14 +284,14 @@ class ParagraphSpacingRule(Rule):
         if before_found is not None:
             details.append(f"antes={before_found:.1f} pt")
         if after_found is not None:
-            details.append(f"despues={after_found:.1f} pt")
+            details.append(f"después={after_found:.1f} pt")
         return [
             self.finding(
-                f"Espacio extra entre parrafos ({', '.join(details)}) en {total} parrafo(s).",
+                f"Espacio extra entre párrafos ({', '.join(details)}) en {total} párrafo(s).",
                 paragraph_index=first.index,
-                location=f"Parrafo {first.index + 1}",
+                location=f"Párrafo {first.index + 1}",
                 excerpt=first.excerpt(),
-                suggestion="Definir 0 pt de espacio antes y despues del parrafo.",
+                suggestion="Definir 0 pt de espacio antes y después del párrafo.",
             )
         ]
 

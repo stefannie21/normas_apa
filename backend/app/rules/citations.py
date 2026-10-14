@@ -25,9 +25,9 @@ class CitationYearRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="CIT-001",
-            name="Citas con autor y ano",
+            name="Citas con autor y año",
             category=Category.CITAS,
-            description="Toda cita en el texto debe incluir autor y ano de publicacion.",
+            description="Toda cita en el texto debe incluir autor y año de publicación.",
             default_severity=Severity.ERROR,
         )
 
@@ -45,11 +45,11 @@ class CitationYearRule(Rule):
                 if not YEAR_RE.search(inner):
                     findings.append(
                         self.finding(
-                            f"Cita sin ano de publicacion: '({inner})'.",
+                            f"Cita sin año de publicación: '({inner})'.",
                             paragraph_index=p.index,
-                            location=f"Parrafo {p.index + 1}",
+                            location=f"Párrafo {p.index + 1}",
                             excerpt=p.excerpt(),
-                            suggestion="Agregar el ano: (Autor, ano).",
+                            suggestion="Agregar el año: (Autor, año).",
                         )
                     )
                     break  # un hallazgo por parrafo: evita duplicar el mismo problema
@@ -62,7 +62,7 @@ class AmpersandRule(Rule):
             id="CIT-002",
             name="Uso de & y 'and'/'y'",
             category=Category.CITAS,
-            description="Usar '&' dentro del parentesis y 'and'/'y' en el texto narrativo.",
+            description="Usar '&' dentro del paréntesis y 'and'/'y' en el texto narrativo.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -74,11 +74,11 @@ class AmpersandRule(Rule):
                 if AMP_IN_PAREN_RE.search(match.group(1)):
                     findings.append(
                         self.finding(
-                            "Dentro de una cita parentetica se uso 'and'/'y'; APA usa '&'.",
+                            "Dentro de una cita parentética se usó 'and'/'y'; APA usa '&'.",
                             paragraph_index=p.index,
-                            location=f"Parrafo {p.index + 1}",
+                            location=f"Párrafo {p.index + 1}",
                             excerpt=match.group(0),
-                            suggestion="Reemplazar 'and'/'y' por '&' dentro del parentesis.",
+                            suggestion="Reemplazar 'and'/'y' por '&' dentro del paréntesis.",
                         )
                     )
                     break  # un hallazgo por parrafo
@@ -105,7 +105,7 @@ class EtAlRule(Rule):
                     self.finding(
                         "'et al.' sin punto final en una cita.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
                         suggestion="Escribir 'et al.' con punto al final.",
                     )
@@ -118,9 +118,9 @@ class QuotePageRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="CIT-004",
-            name="Citas textuales con pagina",
+            name="Citas textuales con página",
             category=Category.CITAS,
-            description="Las citas textuales (entre comillas) deben indicar numero de pagina o parrafo.",
+            description="Las citas textuales (entre comillas) deben indicar número de página o párrafo.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -133,9 +133,9 @@ class QuotePageRule(Rule):
                 if not re.search(r"\b(pp?\.|párr\.|parr\.|para\.)\s*\d", inner, re.IGNORECASE):
                     findings.append(
                         self.finding(
-                            "Cita textual sin numero de pagina/parrafo (p., pp., párr.).",
+                            "Cita textual sin número de página/párrafo (p., pp., párr.).",
                             paragraph_index=p.index,
-                            location=f"Parrafo {p.index + 1}",
+                            location=f"Párrafo {p.index + 1}",
                             excerpt=p.excerpt(),
                             suggestion="Agregar 'p. X' o 'pp. X-X' (o 'párr. X') en citas textuales.",
                         )

@@ -22,7 +22,7 @@ def _rec_par(r: ReferenceRecord):
 
 
 class ReferenceItalicsRule(Rule):
-    """Cursiva obligatoria segun el tipo de fuente."""
+    """Cursiva obligatoria según el tipo de fuente."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -30,8 +30,8 @@ class ReferenceItalicsRule(Rule):
             name="Cursivas en la referencia",
             category=Category.REFERENCIAS,
             description=(
-                "Libros, tesis e informes llevan el titulo en cursiva; articulos y "
-                "capitulos llevan en cursiva el nombre de la revista o libro contenedor."
+                "Libros, tesis e informes llevan el título en cursiva; artículos y "
+                "capítulos llevan en cursiva el nombre de la revista o libro contenedor."
             ),
             default_severity=Severity.WARNING,
         )
@@ -47,12 +47,12 @@ class ReferenceItalicsRule(Rule):
                 if not r.has_italics:
                     findings.append(
                         self.finding(
-                            f"Referencia tipo '{ptype}': el titulo debe ir en cursiva.",
+                            f"Referencia tipo '{ptype}': el título debe ir en cursiva.",
                             paragraph_index=r.paragraph_index,
-                            location=f"Pagina {r.page} (Referencias)",
+                            location=f"Página {r.page} (Referencias)",
                             excerpt=r.raw[:160],
-                            suggestion=f"Aplicar cursiva al titulo: {r.title[:80]}",
-                            extra={"bib_kind": "missing_italics", "expected": "titulo", "type": ptype},
+                            suggestion=f"Aplicar cursiva al título: {r.title[:80]}",
+                            extra={"bib_kind": "missing_italics", "expected": "título", "type": ptype},
                         )
                     )
             elif ptype in CONTAINER_ITALIC_TYPES and r.container:
@@ -61,7 +61,7 @@ class ReferenceItalicsRule(Rule):
                         self.finding(
                             f"Referencia tipo '{ptype}': el contenedor debe ir en cursiva.",
                             paragraph_index=r.paragraph_index,
-                            location=f"Pagina {r.page} (Referencias)",
+                            location=f"Página {r.page} (Referencias)",
                             excerpt=r.raw[:160],
                             suggestion=f"Aplicar cursiva al contenedor: {r.container[:80]}",
                             extra={"bib_kind": "missing_italics", "expected": "contenedor", "type": ptype},
@@ -71,16 +71,16 @@ class ReferenceItalicsRule(Rule):
 
 
 class ReferenceAuthorsRule(Rule):
-    """Umbral de autores de APA 7: hasta 20 listados; mas de 20, los 19 + ... + ultimo."""
+    """Umbral de autores de APA 7: hasta 20 listados; más de 20, los 19 + ... + último."""
 
     def __init__(self) -> None:
         super().__init__(
             id="REF-007",
-            name="Numero de autores en la referencia",
+            name="Número de autores en la referencia",
             category=Category.REFERENCIAS,
             description=(
-                "Se listan hasta 20 autores; con mas de 20 se escriben los primeros "
-                "19, puntos suspensivos y el ultimo."
+                "Se listan hasta 20 autores; con más de 20 se escriben los primeros "
+                "19, puntos suspensivos y el último."
             ),
             default_severity=Severity.WARNING,
         )
@@ -97,12 +97,12 @@ class ReferenceAuthorsRule(Rule):
             if r.author_count > MAX_LISTED_AUTHORS and r.initials_count >= 10:
                 findings.append(
                     self.finding(
-                        f"Referencia con {r.author_count} autores; con mas de 20 se "
-                        f"indican los primeros 19, puntos suspensivos y el ultimo.",
+                        f"Referencia con {r.author_count} autores; con más de 20 se "
+                        f"indican los primeros 19, puntos suspensivos y el último.",
                         paragraph_index=r.paragraph_index,
-                        location=f"Pagina {r.page} (Referencias)",
+                        location=f"Página {r.page} (Referencias)",
                         excerpt=r.raw[:160],
-                        suggestion="Recortar a 19 autores + '...' + el ultimo.",
+                        suggestion="Recortar a 19 autores + '...' + el último.",
                         extra={"bib_kind": "too_many_authors", "count": r.author_count},
                     )
                 )
@@ -111,9 +111,9 @@ class ReferenceAuthorsRule(Rule):
                     self.finding(
                         "Referencia sin autor reconocible.",
                         paragraph_index=r.paragraph_index,
-                        location=f"Pagina {r.page} (Referencias)",
+                        location=f"Página {r.page} (Referencias)",
                         excerpt=r.raw[:160],
-                        suggestion="Verificar el formato Autor (ano). Titulo. Fuente.",
+                        suggestion="Verificar el formato Autor (año). Título. Fuente.",
                         extra={"bib_kind": "no_author"},
                     )
                 )
@@ -164,9 +164,9 @@ class CorporateAuthorRule(Rule):
                             f"Autor corporativo '{name}': incluir la sigla entre corchetes "
                             "en la primera cita del texto.",
                             paragraph_index=r.paragraph_index,
-                            location=f"Pagina {r.page} (Referencias)",
+                            location=f"Página {r.page} (Referencias)",
                             excerpt=r.raw[:160],
-                            suggestion=f"Primera cita: {name} [SIGLA] (ano).",
+                            suggestion=f"Primera cita: {name} [SIGLA] (año).",
                             extra={"bib_kind": "corporate_acronym", "entity": name},
                         )
                     )

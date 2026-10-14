@@ -33,7 +33,7 @@ class StructureRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="HEAD-001",
-            name="Estructura de titulos",
+            name="Estructura de títulos",
             category=Category.TITULOS,
             description="El documento debe organizar el contenido mediante títulos y subtítulos con estilos.",
             default_severity=Severity.INFO,
@@ -46,7 +46,7 @@ class StructureRule(Rule):
                 self.finding(
                     "No se detectaron títulos con estilos de encabezado. APA recomienda jerarquizar el contenido.",
                     location="Documento",
-                    suggestion="Aplicar estilos Título 1, Título 2, etc. (Heading 1, Heading 2...) segun la jerarquia.",
+                    suggestion="Aplicar estilos Título 1, Título 2, etc. (Heading 1, Heading 2...) según la jerarquía.",
                 )
             ]
         return []
@@ -58,7 +58,7 @@ class HeadingLevelFormatRule(Rule):
             id="HEAD-002",
             name="Formato de títulos por nivel",
             category=Category.TITULOS,
-            description="Cada nivel de título debe cumplir el formato APA (alineacion, negrita, cursiva).",
+            description="Cada nivel de título debe cumplir el formato APA (alineación, negrita, cursiva).",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -84,9 +84,9 @@ class HeadingLevelFormatRule(Rule):
             if problems:
                 findings.append(
                     self.finding(
-                        f"Titulo nivel {level} incumple el formato APA: {', '.join(problems)}.",
+                        f"Título nivel {level} incumple el formato APA: {', '.join(problems)}.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
                         suggestion=(
                             f"Nivel {level}: {'centrado' if spec['alignment'] == 'center' else 'izquierda'}, "
@@ -102,7 +102,7 @@ class HeadingHierarchyRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="HEAD-003",
-            name="Jerarquia de titulos sin saltos",
+            name="Jerarquía de títulos sin saltos",
             category=Category.TITULOS,
             description="El primer nivel debe ser 1 y no deben saltarse niveles (1 -> 3).",
         )
@@ -116,11 +116,11 @@ class HeadingHierarchyRule(Rule):
         if first.heading_level != 1:
             findings.append(
                 self.finding(
-                    f"El primer titulo es de nivel {first.heading_level}; APA espera empezar en nivel 1.",
+                    f"El primer título es de nivel {first.heading_level}; APA espera empezar en nivel 1.",
                     paragraph_index=first.index,
-                    location=f"Parrafo {first.index + 1}",
+                    location=f"Párrafo {first.index + 1}",
                     excerpt=first.excerpt(),
-                    suggestion="Usar un titulo de nivel 1 para el primer encabezado del documento.",
+                    suggestion="Usar un título de nivel 1 para el primer encabezado del documento.",
                 )
             )
         prev = 1
@@ -129,9 +129,9 @@ class HeadingHierarchyRule(Rule):
             if level > prev + 1:
                 findings.append(
                     self.finding(
-                        f"Salto de jerarquia: nivel {prev} -> nivel {level}.",
+                        f"Salto de jerarquía: nivel {prev} -> nivel {level}.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
                         suggestion="No saltar niveles; usar el nivel inmediatamente inferior.",
                     )
@@ -177,12 +177,12 @@ class HeadingStyleRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="HEAD-004",
-            name="Titulos sin estilo de encabezado",
+            name="Títulos sin estilo de encabezado",
             category=Category.TITULOS,
             description=(
-                "Los parrafos que parecen titulos (negrita, mayusculas o tamano mayor) "
-                "deben usar los estilos Titulo 1, Titulo 2 o Titulo 3 de Word; de lo "
-                "contrario el indice automatico no los recognize."
+                "Los párrafos que parecen títulos (negrita, mayúsculas o tamaño mayor) "
+                "deben usar los estilos Título 1, Título 2 o Título 3 de Word; de lo "
+                "contrario el índice automático no los reconoce."
             ),
             default_severity=Severity.ERROR,
         )
@@ -192,17 +192,17 @@ class HeadingStyleRule(Rule):
         signals: list[str] = []
         text = p.text.strip()
         if _is_uppercase(text):
-            signals.append("Mayusculas")
+            signals.append("Mayúsculas")
         if _bold_ratio(p) >= 0.6:
             signals.append("Negrita")
         size = p.max_size_pt
         base = document.default_font_size_pt or 12.0
         if size is not None and size > base + 0.6:
-            signals.append("Tamano mayor")
+            signals.append("Tamaño mayor")
         elif size is not None and size >= 14.0:
-            signals.append("Tamano mayor")
+            signals.append("Tamaño mayor")
         if HEADING_NUMBER_RE.match(text):
-            signals.append("Numeracion de capitulo")
+            signals.append("Numeración de capítulo")
         return signals
 
     def _is_candidate(
@@ -236,10 +236,10 @@ class HeadingStyleRule(Rule):
         # La negrita aislada NO basta: en una tesis hay palabras resaltadas en
         # negrita en casi todos los parrafos. Se exige una senal estructural o,
         # en su defecto, que el contexto sea tipico de un encabezado.
-        strong = {"Mayusculas", "Tamano mayor", "Numeracion de capitulo"}
+        strong = {"Mayúsculas", "Tamaño mayor", "Numeración de capítulo"}
         if set(signals) & strong:
             # si es solo "mayusculas", ademas debe ser una linea corta y sin punto final
-            if signals == ["Mayusculas"] and len(text.split()) > 8:
+            if signals == ["Mayúsculas"] and len(text.split()) > 8:
                 return False
             return True
         return self._looks_like_heading_by_context(
@@ -276,21 +276,21 @@ class HeadingStyleRule(Rule):
             if not self._is_candidate(p, document, index, paragraphs):
                 continue
             signals = self._signals(p, document)
-            if not (set(signals) & {"Mayusculas", "Tamano mayor", "Numeracion de capitulo"}):
+            if not (set(signals) & {"Mayúsculas", "Tamaño mayor", "Numeración de capítulo"}):
                 signals = signals + ["Encabezado por contexto"]
             style = (p.style_name or "Normal").strip() or "Normal"
             detected = " / ".join(dict.fromkeys(signals))
             level_guess = 2 if HEADING_NUMBER_RE.match(p.text.strip()) and "." in p.text.strip()[:6] else 1
             findings.append(
                 self.finding(
-                    f"Titulo sin estilo asignado: \"{p.excerpt(90)}\" - "
+                    f"Título sin estilo asignado: \"{p.excerpt(90)}\" - "
                     f"Formato detectado: {detected} (Estilo actual: {style}).",
                     paragraph_index=p.index,
-                    location=f"Pagina {p.estimated_page} (parrafo {p.index + 1})",
+                    location=f"Página {p.estimated_page} (párrafo {p.index + 1})",
                     excerpt=p.excerpt(90),
                     suggestion=(
-                        f"Aplicar el estilo 'Titulo {level_guess}' de Word a este parrafo "
-                        f"para que aparezca en el indice automatico."
+                        f"Aplicar el estilo 'Título {level_guess}' de Word a este párrafo "
+                        f"para que aparezca en el índice automático."
                     ),
                     extra={
                         "heading_style_missing": True,

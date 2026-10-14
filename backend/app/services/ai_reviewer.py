@@ -30,12 +30,12 @@ MODEL_IA = "AI-010"
 MODEL_CONF_MIN = 0.6  # por debajo de esto es sugerencia, nunca correccion
 
 SYSTEM_PROMPT = (
-    "Eres un asesor experto en normas APA (7.a edicion). Recibes un arreglo JSON con "
+    "Eres un asesor experto en normas APA (7.a edición). Recibes un arreglo JSON con "
     "las citas del texto y las entradas de la lista de referencias de una tesis. "
     "Para CADA referencia determina: (1) 'type' entre articulo, libro, capitulo, "
-    "tesis, informe, web, otro; (2) 'missing': elementos APA ausentes segun ese tipo "
-    "de fuente; (3) 'suggestion': correccion concreta; (4) 'confidence' de 0 a 1. "
-    "No inventes datos que no esten en la entrada. Responde SOLO con un arreglo JSON "
+    "tesis, informe, web, otro; (2) 'missing': elementos APA ausentes según ese tipo "
+    "de fuente; (3) 'suggestion': corrección concreta; (4) 'confidence' de 0 a 1. "
+    "No inventes datos que no estén en la entrada. Responde SOLO con un arreglo JSON "
     "de objetos con las claves: index, type, missing (arreglo de cadenas), "
     "suggestion, confidence. Sin texto fuera del JSON."
 )
@@ -125,31 +125,22 @@ def _post_with_retry(url: str, body: dict, headers: dict, attempts: int = MAX_AT
             raise
     if last is not None:
         raise last
-    raise RuntimeError("el proveedor no respondio")
+    raise RuntimeError("el proveedor no respondió")
 
 
-def classify_references(
-    document: ParsedDocument, settings: Settings
-) -> tuple[list[Finding], list[str]]:
-    """Devuelve (hallazgos, avisos)."""
-    bib = document.bibliography
-    if not settings.ai_available or bib is None or not bib.references:
-        return [], []
-
-    payload = build_payload(bib)
-    user_content = json.dumps(payload, ensure_ascii=False)
-
+def _build_request(settings: Settings, model: str, user_content: str) -> tuple[dict, dict]:
+    """Construye (url, headers, body) para un modelo concreto de la cascada."""
     if settings.provider == "gemini":
         body = {
             "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": [{"parts": [{"text": user_content}]}],
             "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"},
         }
-        url = f"{settings.base_url}/models/{settings.resolved_model}:generateContent"
+        url = f"{settings.base_url}/models/{model}:generateContent"
         headers = {"x-goog-api-key": settings.resolved_key, "Content-Type": "application/json"}
     else:
         body = {
-            "model": settings.resolved_model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
@@ -162,16 +153,52 @@ def classify_references(
             "Authorization": f"Bearer {settings.resolved_key}",
             "Content-Type": "application/json",
         }
+    return url, headers, body
 
-    try:
-        data = _post_with_retry(url, body, headers)
-        if settings.provider == "gemini":
-            content = data["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            content = data["choices"][0]["message"]["content"]
-        items = _extract_json(content.strip())
-    except Exception as exc:
-        logger.warning("Clasificacion IA fallo: %s", exc)
+
+def _request_with_cascade(settings: Settings, user_content: str) -> tuple[list[dict], str, str | None]:
+    """Intenta cada modelo de la cascada en orden.
+
+    Devuelve (items, modelo_usado, error). Si un modelo falla (no existe, cuota
+    agotada, error del proveedor) se pasa al siguiente. El ultimo error se
+    devuelve si ninguno responde.
+    """
+    models = settings.model_cascade
+    last_error: str | None = None
+    for model in models:
+        url, headers, body = _build_request(settings, model, user_content)
+        try:
+            data = _post_with_retry(url, body, headers)
+            if settings.provider == "gemini":
+                content = data["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                content = data["choices"][0]["message"]["content"]
+            items = _extract_json(content.strip())
+            logger.info("Revisión IA completada con el modelo %s", model)
+            return items, model, None
+        except Exception as exc:
+            last_error = f"{model}: {exc}"
+            logger.warning(
+                "Modelo IA %s falló (%s); se prueba el siguiente de la cascada", model, exc
+            )
+            continue
+    return [], models[-1] if models else "", last_error
+
+
+def classify_references(
+    document: ParsedDocument, settings: Settings
+) -> tuple[list[Finding], list[str], str]:
+    """Devuelve (hallazgos, avisos, modelo_usado)."""
+    bib = document.bibliography
+    if not settings.ai_available or bib is None or not bib.references:
+        return [], [], ""
+
+    payload = build_payload(bib)
+    user_content = json.dumps(payload, ensure_ascii=False)
+
+    items, used_model, error = _request_with_cascade(settings, user_content)
+    if error is not None:
+        logger.warning("Clasificación IA falló en toda la cascada: %s", error)
         return (
             [
                 Finding(
@@ -179,17 +206,21 @@ def classify_references(
                     category=Category.GENERAL,
                     severity=Severity.INFO,
                     message=(
-                        "No se pudo completar la clasificacion de referencias por IA. "
+                        "No se pudo completar la clasificación de referencias por IA. "
                         "El resto de verificaciones se mantiene."
                     ),
                     location="IA",
-                    extra={"ai_error": type(exc).__name__},
+                    extra={"ai_error": error, "models_tried": settings.model_cascade},
                 )
             ],
-["La revision por IA no se pudo ejecutar; el informe conserva el resto de reglas."],
+            ["La revisión por IA no se pudo ejecutar; el informe conserva el resto de reglas."],
+            "",
         )
 
     findings: list[Finding] = []
+    notes: list[str] = []
+    if used_model:
+        notes.append(f"Revisión IA ejecutada con el modelo {used_model}.")
     notes: list[str] = []
     for item in items:
         try:
@@ -228,9 +259,9 @@ def classify_references(
                     f"Referencia de tipo '{rtype}': faltan {', '.join(missing[:4])}."
                 ),
                 suggestion=suggestion
-                or f"Completar {', '.join(missing[:3])} segun APA 7 para una fuente tipo '{rtype}'.",
+                or f"Completar {', '.join(missing[:3])} según APA 7 para una fuente tipo '{rtype}'.",
                 paragraph_index=ref.paragraph_index,
-                location=f"Pagina {ref.page} (Referencias)",
+                location=f"Página {ref.page} (Referencias)",
                 excerpt=ref.raw[:160],
                 extra={
                     "ai_source_type": rtype,
@@ -241,4 +272,4 @@ def classify_references(
                 },
             )
         )
-    return findings, notes
+    return findings, notes, used_model

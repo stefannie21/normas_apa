@@ -15,8 +15,8 @@ class Severity(str, Enum):
 
 
 class Category(str, Enum):
-    FORMATO = "Formato de pagina y texto"
-    TITULOS = "Titulos y jerarquia"
+    FORMATO = "Formato de página y texto"
+    TITULOS = "Títulos y jerarquía"
     CITAS = "Citas en el texto"
     REFERENCIAS = "Lista de referencias"
     GENERAL = "Aspectos generales"

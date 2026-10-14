@@ -14,11 +14,11 @@ from backend.app.services.docx_parser import ParsedDocument
 
 SUG_CITA = (
     "Agregar la entrada correspondiente en la lista de Referencias, o corregir "
-    "el apellido/ano en la cita para que coincida con una referencia existente."
+    "el apellido/año en la cita para que coincida con una referencia existente."
 )
 SUG_REF = (
     "Citar esta fuente en el cuerpo del texto, o eliminarla de la lista de "
-    "Referencias si no se utilizo en el trabajo."
+    "Referencias si no se utilizó en el trabajo."
 )
 
 
@@ -74,7 +74,7 @@ class MissingReferenceRule(Rule):
                     + (f" (aparece en {len(appearances)} lugar/es)" if len(appearances) > 1 else "")
                     + ".",
                     paragraph_index=first.paragraph_index,
-                    location=f"Pagina(s) {pages} (parrafo {first.paragraph_index + 1})",
+                    location=f"Página(s) {pages} (párrafo {first.paragraph_index + 1})",
                     excerpt=first.raw,
                     suggestion=SUG_CITA,
                     extra={
@@ -112,7 +112,7 @@ class UncitedReferenceRule(Rule):
                 self.finding(
                     f"Referencia sin citar en el cuerpo: {r.label}.",
                     paragraph_index=r.paragraph_index,
-                    location=f"Pagina {r.page} (Referencias)",
+                    location=f"Página {r.page} (Referencias)",
                     excerpt=r.raw[:160],
                     suggestion=SUG_REF,
                     extra={
@@ -127,16 +127,16 @@ class UncitedReferenceRule(Rule):
 
 
 class YearMismatchRule(Rule):
-    """El ano de la cita no coincide con ninguna referencia de ese autor."""
+    """El año de la cita no coincide con ninguna referencia de ese autor."""
 
     def __init__(self) -> None:
         super().__init__(
             id="CRUCE-003",
-            name="Ano inconsistente entre cita y referencia",
+            name="Año inconsistente entre cita y referencia",
             category=Category.CITAS,
             description=(
-                "Cuando el autor y el ano de la cita coinciden con una referencia "
-                "pero el ano difiere, suele haber un error de transcripcion."
+                "Cuando el autor y el año de la cita coinciden con una referencia "
+                "pero el año difiere, suele haber un error de transcripción."
             ),
             default_severity=Severity.WARNING,
         )
@@ -164,14 +164,14 @@ class YearMismatchRule(Rule):
             available = sorted({r.year for r in same_author if r.year})
             findings.append(
                 self.finding(
-                    f"El ano {c.year} de la cita de {c.surnames[0]} no aparece en "
-                    f"las referencias (anos disponibles: {', '.join(str(a) for a in available) or 'sin ano'}).",
+                    f"El año {c.year} de la cita de {c.surnames[0]} no aparece en "
+                    f"las referencias (años disponibles: {', '.join(str(a) for a in available) or 'sin año'}).",
                     paragraph_index=c.paragraph_index,
-                    location=f"Pagina {c.page} (parrafo {c.paragraph_index + 1})",
+                    location=f"Página {c.page} (párrafo {c.paragraph_index + 1})",
                     excerpt=c.raw,
                     suggestion=(
-                        "Verificar el ano: si es correcto, agregar la referencia "
-                        f"{c.surnames[0]} ({c.year}); si no, corregir la cita al ano "
+                        "Verificar el año: si es correcto, agregar la referencia "
+                        f"{c.surnames[0]} ({c.year}); si no, corregir la cita al año "
                         f"{available[0] if available else 'correcto'}."
                     ),
                     extra={

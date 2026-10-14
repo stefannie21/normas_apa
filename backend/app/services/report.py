@@ -8,7 +8,7 @@ from backend.app.services.analyzer import AnalysisResult
 SEVERITY_LABEL = {
     "error": "Error",
     "warning": "Advertencia",
-    "info": "Observacion",
+    "info": "Observación",
 }
 
 SEVERITY_COLOR = {
@@ -116,11 +116,11 @@ def render_html(report: dict) -> str:
    <div class="card"><div class="num" style="color:{SEVERITY_COLOR['info']}">{by_sev.get("info", 0)}</div><div>Observaciones</div></div>
  </div>
  <table>
-   <thead><tr><th>Gravedad</th><th>Categoria</th><th>Regla</th><th>Ubicacion</th><th>Detalle</th></tr></thead>
+   <thead><tr><th>Gravedad</th><th>Categoría</th><th>Regla</th><th>Ubicación</th><th>Detalle</th></tr></thead>
    <tbody>
      {''.join(rows) if rows else '<tr><td colspan="5">Sin hallazgos. El documento cumple los criterios verificados.</td></tr>'}
    </tbody>
  </table>
- <p class="meta" style="margin-top:2rem">Informe automatico de apoyo. No sustituye la revision de un asesor humano.</p>
+ <p class="meta" style="margin-top:2rem">Informe automático de apoyo. No sustituye la revisión de un asesor humano.</p>
 </body>
 </html>"""

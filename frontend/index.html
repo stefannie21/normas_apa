@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>APA Studio - Revision de tesis</title>
+  <title>APA Studio - Revisión de tesis</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
           <span class="brand-name">APA&nbsp;Studio</span>
         </div>
         <div class="doc-title">
-          <span id="doc-name">Documento sin titulo</span>
+          <span id="doc-name">Documento sin título</span>
           <span class="doc-badge" id="doc-badge" hidden>APA</span>
         </div>
       </div>
@@ -23,8 +23,8 @@
         <button class="tb-btn" id="open-btn" title="Abrir .docx">
           <span data-icon="folder"></span> Abrir
         </button>
-        <button class="tb-btn" id="save-btn" disabled title="Guardar los cambios en este navegador">
-          <span data-icon="save"></span> Guardar
+        <button class="tb-btn" id="save-btn" disabled title="Descargar documento corregido (.docx)">
+          <span data-icon="save"></span> Descargar corregido
         </button>
         <button class="tb-btn primary" id="analyze-btn" disabled title="Verificar documento contra las normas APA">
           <span data-icon="search"></span> Verificar documento
@@ -59,9 +59,9 @@
           <div class="empty-card">
             <div class="empty-icon" data-icon="docs"></div>
             <h2>Abre una tesis o proyecto de tesis</h2>
-            <p>Sube un archivo <strong>.docx</strong> para editarlo como en Word y verificar su cumplimiento con las normas APA (7.a edicion).</p>
+            <p>Sube un archivo <strong>.docx</strong> para editarlo como en Word y verificar su cumplimiento con las normas APA (7.a edición).</p>
             <button class="empty-btn" id="empty-open">Seleccionar archivo .docx</button>
-            <p class="hint">Tambien puedes arrastrar el archivo aqui.</p>
+            <p class="hint">También puedes arrastrar el archivo aquí.</p>
           </div>
         </div>
       </section>
@@ -86,7 +86,7 @@
 
     <footer class="statusbar">
       <div class="status-left">
-        <span id="status-pages">Pagina 1 de 1</span>
+        <span id="status-pages">Página 1 de 1</span>
         <span class="sep"></span>
         <span id="status-words">0 palabras</span>
         <span class="sep"></span>
@@ -123,8 +123,8 @@
       </div>
       <div class="modal-body">
         <p class="modal-note">
-          Solo se corrigen problemas <b>de formato y puntuacion</b>. No se toca el contenido,
-          los autores ni los anos de las citas: eso se resuelve a mano.
+          Solo se corrigen problemas <b>de formato y puntuación</b>. No se toca el contenido,
+          los autores ni los años de las citas: eso se resuelve a mano.
         </p>
         <div class="fix-list" id="fix-list"></div>
       </div>
@@ -143,6 +143,7 @@
   <script src="/static/vendor/mammoth.browser.min.js"></script>
   <script src="/static/pager.js"></script>
   <script src="/static/storage.js"></script>
+  <script src="/static/history.js"></script>
   <script src="/static/commands.js"></script>
   <script src="/static/icons.js"></script>
   <script src="/static/fixer.js"></script>

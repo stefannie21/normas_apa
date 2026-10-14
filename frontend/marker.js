@@ -197,7 +197,7 @@ este modulo NUNCA modifica el texto del usuario.
       window.Fixer &&
       uniqueRules.some((r) => window.Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
     const label =
-      sev.severity === "error" ? "Error" : sev.severity === "warning" ? "Alerta" : "Observacion";
+      sev.severity === "error" ? "Error" : sev.severity === "warning" ? "Alerta" : "Observación";
 
     const msgs = list
       .map((f) => `<li><b>${esc(f.rule_id || "")}</b> ${esc(f.message || "")}${

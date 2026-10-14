@@ -8,14 +8,15 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Length
 from lxml import etree
-from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
 from backend.app.services import ai_reviewer, report
 from backend.app.services.analyzer import analyze
 from backend.app.services.docx_parser import parse_docx
+from backend.app.services.docx_writer import apply_corrections
 
 router = APIRouter(prefix="/api", tags=["apa"])
 
@@ -28,6 +29,7 @@ def health() -> dict:
         "ai_enabled": settings.ai_available,
         "ai_provider": settings.provider,
         "ai_model": settings.resolved_model,
+        "ai_cascade": settings.model_cascade,
     }
 
 
@@ -70,6 +72,12 @@ def _text_key(text: str, n: int = 48) -> str:
 
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+# Tamano de pagina por defecto: A4 (21 x 29.7 cm). Se usa solo cuando el .docx
+# no declara w:pgSz. Antes caia en Carta (8.5 x 11 in), que no es el papel
+# habitual de las tesis.
+DEFAULT_PAGE_W_IN = 8.268
+DEFAULT_PAGE_H_IN = 11.693
 
 
 def _in(value, default: float) -> float:
@@ -214,8 +222,9 @@ def _sections_meta(doc) -> list[dict]:
 
     out: list[dict] = []
     for i, s in enumerate(doc.sections):
-        w = _in(s.page_width, 8.5)
-        h = _in(s.page_height, 11.0)
+        # A4 (21 x 29.7 cm) si el .docx no declara tamano de pagina
+        w = _in(s.page_width, DEFAULT_PAGE_W_IN)
+        h = _in(s.page_height, DEFAULT_PAGE_H_IN)
         orient = None
         try:
             pg_sz = s._sectPr.find(W_NS + "pgSz")
@@ -340,13 +349,45 @@ def ai_classify_endpoint(file: UploadFile = File(...)) -> JSONResponse:
     """
     settings = get_settings()
     document = _load_doc(file)
-    findings, notes = ai_reviewer.classify_references(document, settings)
+    findings, notes, used_model = ai_reviewer.classify_references(document, settings)
     return JSONResponse(
         {
             "ai_enabled": settings.ai_available,
             "provider": settings.provider,
-            "model": settings.resolved_model,
+            "model": used_model or settings.resolved_model,
+            "cascade": settings.model_cascade,
             "findings": [f.to_dict() for f in findings],
             "notes": notes,
         }
+    )
+
+
+@router.post("/export")
+def export_endpoint(
+    file: UploadFile = File(...),
+    rules: str = Form(""),
+):
+    """Devuelve un .docx nuevo con las correcciones aplicadas de forma permanente.
+
+    Recibe el .docx original y la lista de IDs de reglas corregidas (separados
+    por coma). Aplica los cambios directamente con python-docx y devuelve el
+    archivo binario.
+    """
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .docx")
+    data = _read_upload(file, get_settings())
+    rule_ids = [r.strip() for r in rules.split(",") if r.strip()] if rules else []
+    try:
+        corrected = apply_corrections(data, rule_ids)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422, detail=f"No se pudo generar el documento: {exc}"
+        ) from exc
+    # Nombre del archivo: original sin .docx + "-correcciones.docx"
+    base = file.filename.rsplit(".docx", 1)[0]
+    out_name = f"{base}-correcciones.docx"
+    return Response(
+        content=corrected,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{out_name}"'},
     )

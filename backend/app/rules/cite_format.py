@@ -14,16 +14,16 @@ ET_AL_THRESHOLD = 3
 
 
 class EtAlThresholdRule(Rule):
-    """Con tres o mas autores se usa 'primer apellido et al.' desde la primera mencion."""
+    """Con tres o más autores se usa 'primer apellido et al.' desde la primera mención."""
 
     def __init__(self) -> None:
         super().__init__(
             id="CIT-005",
-            name="Uso de 'et al.' con tres o mas autores",
+            name="Uso de 'et al.' con tres o más autores",
             category=Category.CITAS,
             description=(
-                "Las obras de tres o mas autores se citan con el primer apellido "
-                "seguido de 'et al.' desde la primera mencion."
+                "Las obras de tres o más autores se citan con el primer apellido "
+                "seguido de 'et al.' desde la primera mención."
             ),
             default_severity=Severity.WARNING,
         )
@@ -64,9 +64,9 @@ class EtAlThresholdRule(Rule):
                     self.finding(
                         f"Obra de {len(c.surnames)}+ autores citada sin 'et al.': {surname}.",
                         paragraph_index=c.paragraph_index,
-                        location=f"Pagina {c.page} (parrafo {c.paragraph_index + 1})",
+                        location=f"Página {c.page} (párrafo {c.paragraph_index + 1})",
                         excerpt=c.raw,
-                        suggestion=f"Usar '{surname} et al.' desde la primera mencion.",
+                        suggestion=f"Usar '{surname} et al.' desde la primera mención.",
                         extra={"bib_kind": "et_al_missing", "surname": surname},
                     )
                 )
@@ -74,7 +74,7 @@ class EtAlThresholdRule(Rule):
 
 
 class BlockQuoteRule(Rule):
-    """Cita en bloque de 40 palabras o mas: sin comillas, sangria y punto antes del parentesis."""
+    """Cita en bloque de 40 palabras o más: sin comillas, sangría y punto antes del paréntesis."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -82,8 +82,8 @@ class BlockQuoteRule(Rule):
             name="Cita textual en bloque",
             category=Category.CITAS,
             description=(
-                "Las citas de 40 palabras o mas van en bloque independiente, sin "
-                "comillas, con sangria de 1.27 cm y con el punto antes del parentesis."
+                "Las citas de 40 palabras o más van en bloque independiente, sin "
+                "comillas, con sangría de 1.27 cm y con el punto antes del paréntesis."
             ),
             default_severity=Severity.WARNING,
         )
@@ -106,9 +106,9 @@ class BlockQuoteRule(Rule):
                         f"Cita de {words} palabras entrecomillada; a partir de "
                         f"{BLOCK_MIN_WORDS} palabras debe ir en bloque, sin comillas.",
                         paragraph_index=p.index,
-                        location=f"Pagina {p.estimated_page} (parrafo {p.index + 1})",
+                        location=f"Página {p.estimated_page} (párrafo {p.index + 1})",
                         excerpt=p.excerpt(140),
-                        suggestion="Quitar comillas y aplicar sangria de 1.27 cm al bloque.",
+                        suggestion="Quitar comillas y aplicar sangría de 1.27 cm al bloque.",
                         extra={"bib_kind": "block_should_be_plain", "words": words},
                     )
                 )
@@ -117,7 +117,7 @@ class BlockQuoteRule(Rule):
                     self.finding(
                         f"Cita en bloque de {words} palabras conserva las comillas.",
                         paragraph_index=p.index,
-                        location=f"Pagina {p.estimated_page} (parrafo {p.index + 1})",
+                        location=f"Página {p.estimated_page} (párrafo {p.index + 1})",
                         excerpt=p.excerpt(140),
                         suggestion="En bloque no se usan comillas.",
                         extra={"bib_kind": "block_has_quotes", "words": words},
@@ -127,7 +127,7 @@ class BlockQuoteRule(Rule):
 
 
 class CitationPeriodRule(Rule):
-    """Posicion del punto final: despues del parentesis en citas cortas, antes en bloque."""
+    """Posición del punto final: después del paréntesis en citas cortas, antes en bloque."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -135,8 +135,8 @@ class CitationPeriodRule(Rule):
             name="Punto final de la cita",
             category=Category.CITAS,
             description=(
-                "En citas cortas el punto va despues del parentesis; en la cita en "
-                "bloque, antes del parentesis."
+                "En citas cortas el punto va después del paréntesis; en la cita en "
+                "bloque, antes del paréntesis."
             ),
             default_severity=Severity.WARNING,
         )
@@ -165,11 +165,11 @@ class CitationPeriodRule(Rule):
                 if before.endswith("."):
                     findings.append(
                         self.finding(
-                            "En la cita en bloque el punto va antes del parentesis.",
+                            "En la cita en bloque el punto va antes del paréntesis.",
                             paragraph_index=p.index,
-                            location=f"Pagina {c.page} (parrafo {p.index + 1})",
+                            location=f"Página {c.page} (párrafo {p.index + 1})",
                             excerpt=p.excerpt(140),
-                            suggestion="Mover el punto antes del parentesis de la cita.",
+                            suggestion="Mover el punto antes del paréntesis de la cita.",
                             extra={"bib_kind": "period_in_block"},
                         )
                     )
@@ -178,11 +178,11 @@ class CitationPeriodRule(Rule):
                 if before.endswith("."):
                     findings.append(
                         self.finding(
-                            "En una cita parentetica corta el punto va despues del parentesis.",
+                            "En una cita parentética corta el punto va después del paréntesis.",
                             paragraph_index=p.index,
-                            location=f"Pagina {c.page} (parrafo {p.index + 1})",
+                            location=f"Página {c.page} (párrafo {p.index + 1})",
                             excerpt=p.excerpt(140),
-                            suggestion="Mover el punto despues del parentesis de la cita.",
+                            suggestion="Mover el punto después del paréntesis de la cita.",
                             extra={"bib_kind": "period_before_short_citation"},
                         )
                     )

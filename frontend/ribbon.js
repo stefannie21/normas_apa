@@ -24,22 +24,32 @@
           controls: [
             { type: "select", cmd: "fontName", options: ["Times New Roman", "Calibri", "Arial", "Georgia", "Lucida Sans Unicode", "Computer Modern"], default: "Times New Roman" },
             { type: "select", cmd: "fontSize", options: FONT_SIZES, default: 12, numeric: true },
-            { type: "action", cmd: "bold", icon: "bold", label: "N", toggle: true },
-            { type: "action", cmd: "italic", icon: "italic", label: "C", toggle: true },
-            { type: "action", cmd: "underline", icon: "underline", label: "S", toggle: true },
+            // Las letras son las del atajo en espanol: N negrita, C cursiva, S
+            // subrayado. Antes se dibujaba encima el icono con la letra inglesa
+            // (B, I, U), que es la de Word en ingles y despista al usuario.
+            // Van en un grupo propio porque el grupo "Fuente" es mas ancho que
+            // su hueco y, sin agruparlos, flex los reparte entre dos filas.
+            {
+              type: "group",
+              controls: [
+                { type: "action", cmd: "bold", letter: "N", label: "Negrita", toggle: true },
+                { type: "action", cmd: "italic", letter: "C", label: "Cursiva", toggle: true },
+                { type: "action", cmd: "underline", letter: "S", label: "Subrayado", toggle: true },
+              ],
+            },
             { type: "color", prop: "foreColor", label: "Color de texto", icon: "color" },
             { type: "color", prop: "hiliteColor", label: "Resaltar", icon: "highlight" },
           ],
         },
         {
-          label: "Parrafo",
+          label: "Párrafo",
           controls: [
             { type: "action", cmd: "justifyLeft", icon: "alignLeft", label: "Izquierda", toggle: true },
             { type: "action", cmd: "justifyCenter", icon: "alignCenter", label: "Centrar", toggle: true },
             { type: "action", cmd: "justifyRight", icon: "alignRight", label: "Derecha", toggle: true },
             { type: "action", cmd: "justifyFull", icon: "alignJustify", label: "Justificar", toggle: true },
-            { type: "action", cmd: "outdent", icon: "indentDec", label: "Reducir sangria" },
-            { type: "action", cmd: "indent", icon: "indentInc", label: "Aumentar sangria" },
+            { type: "action", cmd: "outdent", icon: "indentDec", label: "Reducir sangría" },
+            { type: "action", cmd: "indent", icon: "indentInc", label: "Aumentar sangría" },
             { type: "select", cmd: "lineHeight", options: ["1", "1.15", "1.5", "2", "2.5", "3"], default: "2", label: "Interlineado" },
           ],
         },
@@ -67,7 +77,7 @@
         {
           label: "Listas",
           controls: [
-            { type: "action", cmd: "insertUnorderedList", icon: "bulletList", label: "Vinetos", toggle: true },
+            { type: "action", cmd: "insertUnorderedList", icon: "bulletList", label: "Viñetas", toggle: true },
             { type: "action", cmd: "insertOrderedList", icon: "numberedList", label: "Numerada", toggle: true },
           ],
         },
@@ -78,20 +88,20 @@
       label: "Revisar APA",
       groups: [
         {
-          label: "Revision",
+          label: "Revisión",
           controls: [
 { type: "action", action: "analyze", icon: "check", label: "Verificar normas APA", big: true, primary: true },
-            { type: "action", action: "ai-review", icon: "spark", label: "Revision con IA", big: true },
+            { type: "action", action: "ai-review", icon: "spark", label: "Revisión con IA", big: true },
             { type: "action", action: "fix-doc", icon: "fix", label: "Corregir documento", big: true },
             { type: "action", action: "toggle-pane", icon: "panel", label: "Panel de informe" },
             { type: "action", action: "clear-marks", icon: "paint", label: "Quitar marcas" },
           ],
         },
 {
-          label: "Paginas",
+          label: "Páginas",
           controls: [
-            { type: "action", action: "page-break", icon: "pageBreak", label: "Salto de pagina" },
-            { type: "action", action: "repaginate", icon: "ruler", label: "Reorganizar paginas", big: true },
+            { type: "action", action: "page-break", icon: "pageBreak", label: "Salto de página" },
+            { type: "action", action: "repaginate", icon: "ruler", label: "Reorganizar páginas", big: true },
           ],
         },
         {
@@ -177,12 +187,26 @@
     });
     panelsEl.appendChild(panel);
     refreshStates();
+    // al cambiar de pestaña se recrean los botones: hay que volver a reflejar
+    // si queda algo que deshacer o rehacer
+    if (window.History && typeof History.refresh === "function") History.refresh();
   }
 
   function renderControl(c) {
     if (c.type === "select") return renderSelect(c);
     if (c.type === "color") return renderColor(c);
+    if (c.type === "group") return renderGroup(c);
     return renderAction(c);
+  }
+
+  // Fila que no se parte: mantiene juntos los controles que deben caer en la
+  // misma linea (las tres letras de fuente, por ejemplo). El grupo "Fuente" no
+  // cabe entero en su ancho maximo, asi que sin esto flex envuelve y la N se
+  // queda sola en la fila de arriba, separada de la C y la S.
+  function renderGroup(c) {
+    const row = el("div", "rrow");
+    (c.controls || []).forEach((child) => row.appendChild(renderControl(child)));
+    return row;
   }
 
 function renderSelect(c) {
@@ -272,9 +296,16 @@ function renderSelect(c) {
     btn.title = c.label || "";
 
     const parts = [];
-    if (c.icon) parts.push(`<span class="icn">${svg(c.icon, c.big ? 22 : 18)}</span>`);
-    if (c.label) parts.push(`<span>${c.label}</span>`);
+    if (c.letter) {
+      // La letra sustituye al icono: es el atajo en espanol y ocupa el boton
+      // entero, como los botones de Negrita / Cursiva / Subrayado.
+      parts.push(`<span class="ltr">${c.letter}</span>`);
+    } else if (c.icon) {
+      parts.push(`<span class="icn">${svg(c.icon, c.big ? 22 : 18)}</span>`);
+    }
+    if (c.label && !c.letter) parts.push(`<span>${c.label}</span>`);
     btn.innerHTML = parts.join("");
+    if (c.letter) btn.classList.add("letter");
 
     if (c.cmd) {
       btn.dataset.cmd = c.cmd;

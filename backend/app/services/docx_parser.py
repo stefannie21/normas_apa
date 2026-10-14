@@ -13,6 +13,12 @@ from docx.text.paragraph import Paragraph
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
+# Tamano de pagina por defecto: A4 (21 x 29.7 cm). Se usa solo cuando el .docx
+# no declara w:pgSz. Antes caia en Carta (8.5 x 11 in), que no es el papel
+# habitual de las tesis.
+DEFAULT_PAGE_W_IN = 8.268
+DEFAULT_PAGE_H_IN = 11.693
+
 
 @dataclass
 class RunInfo:
@@ -312,8 +318,8 @@ def _estimate_pages(
     """
     geoms: list[tuple[float, float]] = []
     for s in sections:
-        pw = s.page_width_in or 8.5
-        ph = s.page_height_in or 11.0
+        pw = s.page_width_in or DEFAULT_PAGE_W_IN
+        ph = s.page_height_in or DEFAULT_PAGE_H_IN
         top = s.top_margin_in if s.top_margin_in is not None else 1.0
         bottom = s.bottom_margin_in if s.bottom_margin_in is not None else 1.0
         left = s.left_margin_in if s.left_margin_in is not None else 1.0

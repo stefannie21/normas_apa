@@ -23,7 +23,7 @@ class ReferencesPresenceRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="REF-001",
-            name="Seccion de referencias",
+            name="Sección de referencias",
             category=Category.REFERENCIAS,
             description="El documento debe incluir una lista de referencias titulada 'Referencias'.",
             default_severity=Severity.ERROR,
@@ -42,16 +42,16 @@ class ReferencesPresenceRule(Rule):
             if has_any_citation:
                 return [
                     self.finding(
-                        "Se encontraron citas pero no una seccion 'Referencias'.",
+                        "Se encontraron citas pero no una sección 'Referencias'.",
                         location="Documento",
-                        suggestion="Agregar el titulo 'Referencias' (centrado, negrita) y la lista correspondiente.",
+                        suggestion="Agregar el título 'Referencias' (centrado, negrita) y la lista correspondiente.",
                     )
                 ]
             return [
                 self.finding(
-                    "No se encontro la seccion 'Referencias'.",
+                    "No se encontró la sección 'Referencias'.",
                     location="Documento",
-                    suggestion="El documento debe cerrar con una lista de referencias bajo el titulo 'Referencias'.",
+                    suggestion="El documento debe cerrar con una lista de referencias bajo el título 'Referencias'.",
                 )
             ]
         return []
@@ -61,9 +61,9 @@ class HangingIndentRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="REF-002",
-            name="Sangria francesa en referencias",
+            name="Sangría francesa en referencias",
             category=Category.REFERENCIAS,
-            description="Cada referencia debe usar sangria francesa de 1.27 cm (0.5 in).",
+            description="Cada referencia debe usar sangría francesa de 1.27 cm (0.5 in).",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -74,14 +74,14 @@ class HangingIndentRule(Rule):
             hanging = indent is not None and abs(indent - 0.5) <= HANGING_TOLERANCE_IN
             negative_first = first is not None and first < 0
             if not (hanging or negative_first):
-                shown = f"izq={indent if indent is not None else 'n/d'}, 1a linea={first if first is not None else 'n/d'}"
+                shown = f"izq={indent if indent is not None else 'n/d'}, 1a línea={first if first is not None else 'n/d'}"
                 findings.append(
                     self.finding(
-                        f"Referencia sin sangria francesa ({shown}).",
+                        f"Referencia sin sangría francesa ({shown}).",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Aplicar sangria francesa: 1.27 cm a la izquierda y -1.27 cm en primera linea.",
+                        suggestion="Aplicar sangría francesa: 1.27 cm a la izquierda y -1.27 cm en primera línea.",
                     )
                 )
         return findings
@@ -91,9 +91,9 @@ class AlphabeticalOrderRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="REF-003",
-            name="Orden alfabetico de referencias",
+            name="Orden alfabético de referencias",
             category=Category.REFERENCIAS,
-            description="La lista de referencias debe ordenarse alfabeticamente por autor.",
+            description="La lista de referencias debe ordenarse alfabéticamente por autor.",
             default_severity=Severity.WARNING,
         )
 
@@ -107,11 +107,11 @@ class AlphabeticalOrderRule(Rule):
             if key < prev_key:
                 findings.append(
                     self.finding(
-                        "La lista de referencias no esta en orden alfabetico.",
+                        "La lista de referencias no está en orden alfabético.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Ordenar las referencias alfabeticamente por el apellido del primer autor.",
+                        suggestion="Ordenar las referencias alfabéticamente por el apellido del primer autor.",
                     )
                 )
                 break
@@ -122,9 +122,9 @@ class ReferenceYearRule(Rule):
     def __init__(self) -> None:
         super().__init__(
             id="REF-004",
-            name="Ano en cada referencia",
+            name="Año en cada referencia",
             category=Category.REFERENCIAS,
-            description="Cada referencia debe incluir el ano de publicacion.",
+            description="Cada referencia debe incluir el año de publicación.",
             default_severity=Severity.ERROR,
         )
 
@@ -136,11 +136,11 @@ class ReferenceYearRule(Rule):
             if not YEAR_RE.search(p.text):
                 findings.append(
                     self.finding(
-                        "Referencia sin ano de publicacion.",
+                        "Referencia sin año de publicación.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion="Incluir el ano entre parentesis: (2020).",
+                        suggestion="Incluir el año entre paréntesis: (2020).",
                     )
                 )
         return findings
@@ -164,7 +164,7 @@ class DoiFormatRule(Rule):
                     self.finding(
                         "DOI en formato 'doi:...' en lugar de URL.",
                         paragraph_index=p.index,
-                        location=f"Parrafo {p.index + 1}",
+                        location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
                         suggestion="Usar 'https://doi.org/xxxx' o 'https://dx.doi.org/xxxx'.",
                     )

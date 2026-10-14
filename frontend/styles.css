@@ -183,13 +183,26 @@ body {
   background: transparent; border: 1px solid transparent; border-radius: 6px;
   padding: 5px 6px; min-width: 32px; color: var(--ink); cursor: pointer; font-size: .68rem;
 }
-.rbtn:hover { background: #eef2f7; border-color: var(--line); }
+.rbtn:hover:not(:disabled) { background: #eef2f7; border-color: var(--line); }
+.rbtn:disabled { opacity: .32; cursor: not-allowed; }
 .rbtn.on { background: var(--accent-soft); border-color: #b9d2f2; color: var(--accent); }
 .rbtn.big { min-width: 62px; padding: 8px 8px; font-size: .72rem; }
 .rbtn.primary { color: var(--accent); font-weight: 600; }
 .rbtn .icn { display: block; }
 .rbtn .icn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
 .rbtn.big .icn svg { width: 22px; height: 22px; }
+/* Fila que no se parte: mantiene juntos los controles que deben caer juntos. */
+.rrow { display: flex; flex-wrap: nowrap; gap: 2px; align-items: center; }
+/* Botones de fuente (N / C / S): la letra es el atajo en espanol y hace de
+   icono, asi que va grande y centrada. Sin fuente propia, para que se ve igual
+   que el resto de la cinta. */
+.rbtn.letter { padding: 6px 8px; min-width: 28px; }
+.rbtn .ltr {
+  display: block;
+  font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
 
 .rselect-wrap { display: inline-flex; }
 .rselect {
@@ -244,8 +257,18 @@ body.show-ruler .canvas::before {
 }
 
 .sheet {
-  width: 8.5in;
-  min-height: 11in;
+  /* A4 (21 x 29.7 cm) por defecto. El tamaño real de cada hoja lo sobrescribe
+     el paginador con la geometria de su seccion. */
+  width: 21cm;
+  min-height: 29.7cm;
+  /* Layout en columna con flex a proposito: los margenes verticales de los hijos
+     de un bloque se COLAPSAN (solo cuenta el mayor), mientras que Word SUMA el
+     espacio-despues de un parrafo y el espacio-antes del siguiente. Con flex no
+     hay colapso, que es justo como maqueta Word, y el texto respira igual que
+     en el original. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   background: var(--page-bg);
   box-shadow: 0 1px 3px rgba(16,24,40,.22), 0 14px 34px rgba(16,24,40,.14);
   padding: 1in;
@@ -269,16 +292,34 @@ body.show-ruler .canvas::before {
 .sheet h2 { font-size: 1.3em; }
 .sheet h3 { font-size: 1.12em; }
 .sheet img, .sheet svg { max-width: 100%; max-height: var(--content-h, 864px); height: auto; }
-.sheet table { max-width: 100%; }
+.sheet table { max-width: 100%; align-self: flex-start; }
+.sheet > img { align-self: flex-start; }
+/* el medidorhidden replica el contexto de la hoja; tablas e imagenes deben
+   comportarse igual ahi o medirian distinto de como se pintan */
+#apa-measurer > table, #apa-measurer > img { align-self: flex-start; max-width: 100%; }
 .sheet pre { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
 .doc-table { border-collapse: collapse; width: 100%; }
 .doc-table td { border: 1px solid #bbb; padding: 6px 8px; min-width: 40px; }
 .page-break { border-top: 2px dashed #c9d2dd; margin: 18px 0; column-span: all; }
+/* Los saltos importados del .docx se muestran como una marca invisible: se
+   guardan en el flujo para que la repaginacion no los pierda, pero no deben
+   ocupar hueco ni dibujar la linea discontinua que si se ve al insertar uno a
+   mano desde la cinta. */
+.page-break[data-src="word"] { display: none; }
 .finding-hit { background: #fff3b0 !important; box-shadow: 0 0 0 2px #f2c200; border-radius: 3px; }
 
 /* ---------- Indice generado ---------- */
 .doc-toc { margin-bottom: 3px; }
 .toc-title-row { font-weight: 700; font-size: 1.05em; margin-bottom: 4px; }
+/* Word escribe sus indices con anclas internas (_Toc.../_Ref...). En Word esas
+   entradas se ven como texto normal (las pinta el estilo "Indice", no el de
+   hipervinculo), pero mammoth solo conserva el <a>. El navegador las dibujaba
+   azules y subrayadas y el "Indice de Tablas" salia raro. Se pintan como texto
+   del documento, igual que en Word. */
+.sheet a[href^="#_Toc"],
+.sheet a[href^="#_Ref"] {
+  color: inherit; text-decoration: none; cursor: default;
+}
 .toc-entry a {
   display: flex; align-items: baseline; gap: 8px; color: var(--ink);
   text-decoration: none; line-height: 1.9; padding: 1px 0;

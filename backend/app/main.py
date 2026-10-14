@@ -12,8 +12,8 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = BASE_DIR / "frontend"
 
 app = FastAPI(
-    title="Normas APA - Revision de tesis",
-    description="Verifica el cumplimiento de las normas APA (7.a edicion) en documentos .docx.",
+    title="Normas APA - Revisión de tesis",
+    description="Verifica el cumplimiento de las normas APA (7.a edición) en documentos .docx.",
     version="0.1.0",
 )
 
