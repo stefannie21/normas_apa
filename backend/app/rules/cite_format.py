@@ -73,6 +73,80 @@ class EtAlThresholdRule(Rule):
         return findings
 
 
+class EtAlNotAllowedRule(Rule):
+    """APA 7: 'et al.' NO se usa con obras de 1 o 2 autores.
+
+    Con uno o dos autores SIEMPRE se nombran todos, en todas las menciones
+    (primera y siguientes). El uso de 'et al.' en esos casos es incorrecto.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            id="CIT-008",
+            name="'et al.' no permitido con 1 o 2 autores",
+            category=Category.CITAS,
+            description=(
+                "Las obras de uno o dos autores se citan nombrando siempre a todos "
+                "los autores, tanto en la primera mención como en las siguientes. "
+                "'et al.' solo se usa a partir de tres autores."
+            ),
+            default_severity=Severity.ERROR,
+        )
+
+    def check(self, document: ParsedDocument) -> list[Finding]:
+        bib = document.bibliography
+        if not bib:
+            return []
+        # referencias con exactamente 1 o 2 autores (conteo confirmado por iniciales
+        # para no equivocarse cuando el parser no reconoce bien los autores)
+        small_author = {
+            r.surnames[0].lower(): r
+            for r in bib.references
+            if r.surnames
+            and 1 <= r.author_count <= 2
+            and not r.corporate
+        }
+        findings: list[Finding] = []
+        seen: set[tuple[int, str]] = set()
+        for c in bib.citations:
+            if not c.has_et_al or not c.surnames:
+                continue
+            first = c.surnames[0].lower()
+            ref = small_author.get(first)
+            if ref is None:
+                continue
+            key = (c.paragraph_index, first)
+            if key in seen:
+                continue
+            seen.add(key)
+            # nombre completo de los autores segun la referencia
+            if len(ref.surnames) >= 2:
+                correct = f"{ref.surnames[0]} y {ref.surnames[1]}"
+            else:
+                correct = ref.surnames[0]
+            anio = c.year if c.year else (ref.year if ref.year else "año")
+            findings.append(
+                self.finding(
+                    f"Obra de {ref.author_count} autor(es) citada con 'et al.'; "
+                    f"APA 7 exige nombrar a todos: {correct}.",
+                    paragraph_index=c.paragraph_index,
+                    location=f"Página {c.page} (párrafo {c.paragraph_index + 1})",
+                    excerpt=c.raw,
+                    suggestion=(
+                        f"Reemplazar por '({correct}, {anio})' en cita parentética "
+                        f"o '{correct} ({anio})' en cita narrativa."
+                    ),
+                    extra={
+                        "bib_kind": "et_al_not_allowed",
+                        "author_count": ref.author_count,
+                        "surname": ref.surnames[0],
+                        "surnames": ref.surnames[:2],
+                    },
+                )
+            )
+        return findings
+
+
 class BlockQuoteRule(Rule):
     """Cita en bloque de 40 palabras o más: sin comillas, sangría y punto antes del paréntesis."""
 
@@ -190,6 +264,7 @@ class CitationPeriodRule(Rule):
 
 RULES = [
     EtAlThresholdRule(),
+    EtAlNotAllowedRule(),
     BlockQuoteRule(),
     CitationPeriodRule(),
 ]

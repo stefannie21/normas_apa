@@ -5,6 +5,7 @@ Incluye a proposito cada caso que las reglas nuevas deben detectar:
  CRUCE-003 ano inconsistente  | REF-006 falta de cursiva
  REF-007 demasiados autores | REF-008 autor corporativo sin sigla
  CIT-005 cita de 3+ autores sin 'et al.' | CIT-006 cita en bloque entrecomillada
+ CIT-008 'et al.' usado con una obra de 2 autores (prohibido en APA 7)
 """
 from io import BytesIO
 
@@ -41,6 +42,8 @@ def build_citas_sample() -> bytes:
     body("Otros autores coinciden en esto (Delgado, 2018), tal como se discutio antes.")
     # CIT-005: obra de 3+ autores citada sin 'et al.'
     body("La evidencia es contradictoria (Ramos, Soto, y Vega, 2019).")
+    # CIT-008: obra de 2 autores citada con 'et al.' (incorrecto en APA 7)
+    body("Diversos estudios lo confirman (Perez et al., 2023) en el mismo sentido.")
     # CRUCE-001: cita institucional sin referencia
     body("Segun la OMS (2020) la situacion mejoro, pero no se registro en la lista.")
     # CIT-004: cita textual sin numero de pagina
@@ -105,6 +108,8 @@ def build_citas_sample() -> bytes:
     ref("Organizacion Mundial de la Salud. (2020). Informe sobre salud mental. OMS.")
     # citada en el cuerpo, pero la cita textual no trae pagina
     ref("Molina, R. (2019). Competencias digitales en la educacion. Universidad Central.")
+    # CIT-008: referencia de 2 autores que se cita con 'et al.' en el cuerpo
+    ref("Perez, J., y Gomez, M. (2023). Analisis de la calidad educativa. Editorial Sur.")
 
     buf = BytesIO()
     doc.save(buf)
