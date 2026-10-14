@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+.pytest_cache/
+uploads/
+reports/
+
+# artefactos locales de desarrollo
+server_start.log
+captura_*.png
+frontend/tmp_*.docx

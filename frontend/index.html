@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APA Studio - Revision de tesis</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <div class="titlebar-left">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <span class="brand-name">APA&nbsp;Studio</span>
+        </div>
+        <div class="doc-title">
+          <span id="doc-name">Documento sin titulo</span>
+          <span class="doc-badge" id="doc-badge" hidden>APA</span>
+        </div>
+      </div>
+      <div class="titlebar-right">
+        <button class="tb-btn" id="open-btn" title="Abrir .docx">
+          <span data-icon="folder"></span> Abrir
+        </button>
+        <button class="tb-btn" id="save-btn" disabled title="Guardar los cambios en este navegador">
+          <span data-icon="save"></span> Guardar
+        </button>
+        <button class="tb-btn primary" id="analyze-btn" disabled title="Verificar documento contra las normas APA">
+          <span data-icon="search"></span> Verificar documento
+        </button>
+        <div class="avatar" title="Asesor">A</div>
+      </div>
+    </header>
+
+    <nav class="ribbon" id="ribbon">
+      <div class="ribbon-tabs-row">
+        <div class="ribbon-tabs" id="ribbon-tabs"></div>
+        <button class="ribbon-collapse" id="ribbon-collapse" title="Ocultar la barra de herramientas" aria-label="Ocultar la barra de herramientas">
+          <svg class="chev-up" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="chev-down" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" hidden>
+            <path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="ribbon-body">
+        <div class="ribbon-panels" id="ribbon-panels"></div>
+      </div>
+    </nav>
+
+    <main class="workspace">
+      <section class="canvas" id="canvas">
+        <div class="page" id="page" contenteditable="false" spellcheck="false"></div>
+        <div class="empty-state" id="empty-state">
+          <div class="empty-card">
+            <div class="empty-icon" data-icon="docs"></div>
+            <h2>Abre una tesis o proyecto de tesis</h2>
+            <p>Sube un archivo <strong>.docx</strong> para editarlo como en Word y verificar su cumplimiento con las normas APA (7.a edicion).</p>
+            <button class="empty-btn" id="empty-open">Seleccionar archivo .docx</button>
+            <p class="hint">Tambien puedes arrastrar el archivo aqui.</p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="report-pane" id="report-pane" hidden>
+        <div class="pane-head">
+          <span data-icon="clipboard"></span>
+          <h2>Informe APA</h2>
+          <button class="pane-close" id="pane-close" title="Cerrar">&times;</button>
+        </div>
+        <div class="pane-body">
+          <div class="score">
+            <div class="score-ring"><span id="score-num">--</span><small>%</small></div>
+            <div class="score-label">Nivel de cumplimiento</div>
+          </div>
+          <div class="pane-cards" id="pane-cards"></div>
+          <div class="pane-filters" id="pane-filters"></div>
+          <div class="findings" id="findings"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <div class="status-left">
+        <span id="status-pages">Pagina 1 de 1</span>
+        <span class="sep"></span>
+        <span id="status-words">0 palabras</span>
+        <span class="sep"></span>
+        <span id="status-chars">0 caracteres</span>
+        <span class="status-msg" id="status-msg"></span>
+      </div>
+      <div class="status-right">
+        <span class="lang-pill">ES</span>
+        <div class="zoom">
+          <button id="zoom-out" title="Reducir zoom">&minus;</button>
+          <input type="range" id="zoom-range" min="50" max="150" value="100">
+          <button id="zoom-in" title="Aumentar zoom">+</button>
+          <span id="zoom-label">100%</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <div class="modal-backdrop" id="fix-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fix-modal-title">
+      <div class="modal-head">
+        <span class="modal-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/>
+          </svg>
+        </span>
+        <div>
+          <h3 id="fix-modal-title">Corregir el documento</h3>
+          <p class="modal-sub" id="fix-modal-sub"></p>
+        </div>
+        <button class="modal-x" id="fix-modal-close" title="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">
+          Solo se corrigen problemas <b>de formato y puntuacion</b>. No se toca el contenido,
+          los autores ni los anos de las citas: eso se resuelve a mano.
+        </p>
+        <div class="fix-list" id="fix-list"></div>
+      </div>
+      <div class="modal-foot">
+        <span class="modal-count" id="fix-modal-count"></span>
+        <div class="modal-actions">
+          <button class="mbtn ghost" id="fix-undo" hidden>Deshacer</button>
+          <button class="mbtn ghost" id="fix-cancel">Cancelar</button>
+          <button class="mbtn primary" id="fix-apply">Aplicar correcciones</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file" accept=".docx" hidden>
+  <script src="/static/vendor/mammoth.browser.min.js"></script>
+  <script src="/static/pager.js"></script>
+  <script src="/static/storage.js"></script>
+  <script src="/static/commands.js"></script>
+  <script src="/static/icons.js"></script>
+  <script src="/static/fixer.js"></script>
+  <script src="/static/marker.js"></script>
+  <script src="/static/ribbon.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
