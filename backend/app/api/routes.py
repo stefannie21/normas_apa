@@ -17,6 +17,7 @@ from backend.app.services import ai_reviewer, report
 from backend.app.services.analyzer import analyze
 from backend.app.services.docx_parser import parse_docx
 from backend.app.services.docx_writer import apply_corrections
+from backend.app.services.report_docx import build_report_docx
 
 router = APIRouter(prefix="/api", tags=["apa"])
 
@@ -337,6 +338,34 @@ def analyze_html_endpoint(file: UploadFile = File(...)) -> HTMLResponse:
     document = _load_doc(file)
     result = analyze(document)
     return HTMLResponse(report.render_html(report.build_report(result)))
+
+
+@router.post("/report/docx")
+def report_docx_endpoint(file: UploadFile = File(...)):
+    """Genera el informe APA como documento .docx descargable.
+
+    Devuelve un Word con el resumen de cumplimiento, el desglose por categoria
+    y la tabla completa de hallazgos (errores, advertencias y observaciones).
+    """
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .docx")
+    document = _load_doc(file)
+    result = analyze(document)
+    payload = report.build_report(result)
+    try:
+        data = build_report_docx(payload)
+    except Exception as exc:  # pragma: no cover - defensivo
+        raise HTTPException(
+            status_code=422,
+            detail=f"No se pudo generar el informe en Word: {exc}",
+        ) from exc
+    base = file.filename.rsplit(".docx", 1)[0]
+    out_name = f"Informe-APA-{base}.docx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{out_name}"'},
+    )
 
 
 @router.post("/ai/classify")

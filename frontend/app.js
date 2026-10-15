@@ -14,6 +14,7 @@
   const paneClose = document.getElementById("pane-close");
   const scoreNum = document.getElementById("score-num");
   const paneCards = document.getElementById("pane-cards");
+  const downloadReportBtn = document.getElementById("download-report");
   const paneFilters = document.getElementById("pane-filters");
   const findingsEl = document.getElementById("findings");
   const statusMsg = document.getElementById("status-msg");
@@ -470,6 +471,7 @@
     scoreNum.textContent = "--";
     paneCards.innerHTML = "";
     paneFilters.innerHTML = "";
+    if (downloadReportBtn) downloadReportBtn.disabled = true;
     findingsEl.innerHTML = '<p class="empty-pane">Aún no se ha verificado el documento.</p>';
   }
 
@@ -481,6 +483,7 @@
     if (!report.partial) allFindings = report.findings || [];
     lastFindings = report.findings || [];
     scoreNum.textContent = s.compliance_score != null ? s.compliance_score : "--";
+    if (downloadReportBtn) downloadReportBtn.disabled = !currentFile;
 
     currentFindings = report.findings || [];
     const counts = countBy(currentFindings);
@@ -1032,6 +1035,51 @@
     }
   }
 
+  // Descarga el informe APA (todos los errores, advertencias y observaciones)
+  // como un documento Word independiente.
+  async function downloadReportDocx() {
+    if (!currentFile) {
+      showToast("Abre un documento primero", "error");
+      return;
+    }
+    if (downloadReportBtn) downloadReportBtn.disabled = true;
+    statusMsg.textContent = "Generando informe APA en Word...";
+    var formData = new FormData();
+    formData.append("file", currentFile, currentFile.name);
+    try {
+      var res = await fetch("/api/report/docx", { method: "POST", body: formData });
+      if (!res.ok) {
+        var err = await res.json().catch(function () { return { detail: "Error" }; });
+        throw new Error(err.detail || "Error " + res.status);
+      }
+      var blob = await res.blob();
+      var disposition = res.headers.get("Content-Disposition") || "";
+      var fileName = "";
+      var match = disposition.match(/filename="?([^"]+)"?/);
+      if (match) {
+        fileName = match[1];
+      } else {
+        var base = currentFile.name.replace(/\.docx$/i, "");
+        fileName = "Informe-APA-" + base + ".docx";
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      statusMsg.textContent = "";
+      showToast("Informe APA descargado: " + fileName, "ok");
+    } catch (err) {
+      statusMsg.textContent = "";
+      showToast("No se pudo generar el informe: " + err.message, "error");
+    } finally {
+      if (downloadReportBtn) downloadReportBtn.disabled = false;
+    }
+  }
+
   // Restaura el documento de la sesion anterior (si existe) al abrir la app.
   async function restoreSession() {
     let doc = null;
@@ -1080,6 +1128,9 @@
   }
 
   saveBtn.addEventListener("click", downloadCorrectedDocx);
+  if (downloadReportBtn) {
+    downloadReportBtn.addEventListener("click", downloadReportDocx);
+  }
 
   /* ---------- Plegar la cinta de opciones ---------- */
   const ribbonNav = document.getElementById("ribbon");

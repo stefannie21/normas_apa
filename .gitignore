@@ -11,6 +11,7 @@ reports/
 server_start.log
 captura_*.png
 frontend/tmp_*.docx
+tests/_informe_generado.docx
 
 # datos locales del agente (no forman parte del proyecto)
 .workbuddy-ai/

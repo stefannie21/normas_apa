@@ -384,6 +384,17 @@ body.reading #page { cursor: default; }
 .score-ring small { font-size: .8rem; color: var(--muted); }
 .score-label { margin-top: 8px; font-size: .82rem; color: var(--muted); }
 
+.pane-actions { margin-bottom: 12px; }
+.pane-download {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; padding: 9px 12px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  font-size: .84rem; font-weight: 600;
+}
+.pane-download [data-icon] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.pane-download:hover:not(:disabled) { filter: brightness(1.06); }
+.pane-download:disabled { opacity: .5; cursor: not-allowed; }
+
 .pane-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .pane-card { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
 .pane-card .pc-num { font-size: 1.25rem; font-weight: 700; }
