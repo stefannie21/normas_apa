@@ -34,8 +34,17 @@ este modulo NUNCA modifica el texto del usuario.
       parent.removeChild(m);
       parent.normalize();
     });
-    p.querySelectorAll(".apa-flagged").forEach((el) =>
-      el.classList.remove("apa-flagged")
+    // Los parrafos marcados en el margen llevan la clase de gravedad
+    // (apa-mark-error / warning / info), que es la que pinta el fondo. Si solo
+    // se quita "apa-flagged" el parrafo se queda con el color puesto.
+    p.querySelectorAll(".apa-flagged").forEach((el) => {
+      el.classList.remove("apa-flagged", "apa-mark-error", "apa-mark-warning", "apa-mark-info");
+    });
+    // por si quedo alguna clase de gravedad suelta en el documento
+    p.querySelectorAll(".apa-mark-error, .apa-mark-warning, .apa-mark-info").forEach(
+      (el) => {
+        el.classList.remove("apa-mark-error", "apa-mark-warning", "apa-mark-info");
+      }
     );
     close();
   }
