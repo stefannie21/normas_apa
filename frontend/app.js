@@ -498,6 +498,9 @@
     renderFilters();
     renderFindings();
     markInDocument();
+    // el panel de Inicio muestra estos mismos numeros: se le avisa para que no
+    // se quede con los valores anteriores
+    if (window.Sidebar && typeof Sidebar.refresh === "function") Sidebar.refresh();
   }
 
   /* ---------- Senalar los problemas dentro del texto ---------- */
@@ -810,21 +813,27 @@
     return node;
   }
 
+  // Al saltar a un titulo o a un hallazgo NO se borran las marcas de error: el
+  // mapa completo del documento es justo lo que ayuda a situar el problema. Solo
+  // se mueve el resaltado amarillo del elemento anterior.
+  function clearFocusHighlight() {
+    page.querySelectorAll(".finding-hit").forEach((el) => el.classList.remove("finding-hit"));
+    page.querySelectorAll(".toc-entry").forEach((e) => e.classList.remove("outline-hit"));
+  }
+
   function jumpToHeading(id) {
-    clearMarks();
     const target = document.getElementById(id);
     if (!target) return;
+    clearFocusHighlight();
     target.classList.add("finding-hit");
     target.scrollIntoView({ behavior: "smooth", block: "start" });
-    page.querySelectorAll(".toc-entry")
-      .forEach((e) => e.classList.remove("outline-hit"));
     const link = page.querySelector(`a[href="#${id}"]`);
     if (link) link.closest(".toc-entry").classList.add("outline-hit");
   }
 
   function jumpToFinding(f) {
     if (!f) return;
-    clearMarks();
+    clearFocusHighlight();
     let target = null;
     if (f.excerpt && f.excerpt.length > 8) {
       const needle = f.excerpt.slice(0, 30).toLowerCase();
@@ -957,6 +966,9 @@
     },
     pickFile() {
       fileInput.click();
+    },
+    openReport() {
+      if (reportPane.hidden) openPane();
     },
   };
 

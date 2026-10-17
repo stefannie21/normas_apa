@@ -237,6 +237,8 @@ body {
 .stat.error .stat-icn { background: #fde3e1; color: #b3372f; }
 .stat.warning .stat-icn { background: #fdf0d8; color: #96690d; }
 .stat-num { font-size: 1.45rem; font-weight: 700; color: var(--ink); line-height: 1.15; }
+/* sin dato que mostrar: no se disfraza un cero de un resultado */
+.stat.vacio .stat-num { color: #9aa5b1; }
 .stat-label { font-size: .78rem; color: var(--muted); }
 .stat-link {
   margin-top: 9px;
@@ -318,6 +320,20 @@ body {
 }
 .doc-estado.ok { background: #e2f4e9; color: #1e7a45; }
 .doc-estado.pendiente { background: #fdf0d8; color: #96690d; }
+.doc-acciones { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.vbtn {
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: .8rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--ink);
+}
+.vbtn:hover:not(:disabled) { background: #eef2f7; }
+.vbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.vbtn.primary:hover:not(:disabled) { background: var(--accent-dark); }
 
 .pasos { margin: 0; padding-left: 20px; font-size: .85rem; color: var(--muted); line-height: 1.7; }
 .pasos b { color: var(--ink); }

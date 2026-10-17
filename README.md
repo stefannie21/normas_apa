@@ -38,6 +38,9 @@ primer salto de página cuando existe.
   con vista previa, selección y deshacer.
 - **No toca nunca** el contenido, los autores ni los años: eso se resuelve a
   mano, y por eso aparece señalado en lugar de corregido.
+- Al hacer clic en un hallazgo del informe se resalta dónde está, **sin borrar
+  las marcas del resto del documento**: el mapa de errores se mantiene para
+  poder recorrer la lista sin perderlo. "Quitar marcas" las borra todas.
 - **Exporta el documento corregido** a `.docx`, aplicando las correcciones
   directamente sobre el archivo original con `python-docx`.
 - **Descarga el informe en Word** (`.docx`) con el resumen de cumplimiento, el
