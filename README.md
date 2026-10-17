@@ -6,7 +6,7 @@ se verifica su cumplimiento con las **normas APA (7.ª edición)**.
 
 ## Qué hace
 
-- **Verifica** el documento contra 29 reglas programadas (formato de página,
+- **Verifica** el documento contra 30 reglas programadas (formato de página,
   tipografía, interlineado, sangría, títulos, citas en texto y lista de
   referencias) y devuelve un informe con errores, avisos y observaciones.
 - **Señala** cada problema dentro del propio texto, con colores por gravedad, y
@@ -16,8 +16,15 @@ se verifica su cumplimiento con las **normas APA (7.ª edición)**.
   con vista previa, selección y deshacer.
 - **No toca nunca** el contenido, los autores ni los años: eso se resuelve a
   mano, y por eso aparece señalado en lugar de corregido.
-- Revisión opcional por IA (Gemini) como segunda opinión, solo de lectura.
-- Guarda la sesión en el navegador (IndexedDB) para no perder el trabajo.
+- **Exporta el documento corregido** a `.docx`, aplicando las correcciones
+  directamente sobre el archivo original con `python-docx`.
+- **Descarga el informe en Word** (`.docx`) con el resumen de cumplimiento, el
+  desglose por categoría y la tabla completa de hallazgos.
+- Revisión opcional por IA (Gemini) como segunda opinión, solo de lectura, con
+  cascada de modelos y reintentos si el proveedor está saturado.
+- Guarda la sesión en el navegador (IndexedDB) para no perder el trabajo, con
+  aviso al cerrar si hay cambios sin guardar.
+- Historial de cambios con deshacer/rehacer.
 
 > Aviso: este informe es una ayuda automática. No sustituye la revisión de un
 > asesor humano.
@@ -32,11 +39,14 @@ se verifica su cumplimiento con las **normas APA (7.ª edición)**.
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --port 8000
 ```
 
 Abrir <http://127.0.0.1:8000>. La documentación de la API queda en
 <http://127.0.0.1:8000/docs>.
+
+Si el puerto 8000 ya está ocupado por otro servicio de la máquina, cambiarlo con
+`--port 8010` y abrir esa dirección.
 
 ## Revisión por IA (opcional)
 
@@ -72,6 +82,8 @@ backend/app/
     report.py            Informe JSON/HTML
     bibliography.py      Extracción de citas y referencias
     ai_reviewer.py       Revisión por LLM (opcional)
+    docx_writer.py       Aplica correcciones y devuelve un .docx nuevo
+    report_docx.py       Genera el informe APA como .docx descargable
   rules/
     base.py              Tipos base (Finding, Rule, Severity)
     registry.py          Registro de reglas activas
@@ -89,6 +101,7 @@ frontend/
   pager.js               Paginación tipo Word
   ribbon.js              Ribbon (Inicio, Insertar, Revisar APA, Vista)
   commands.js            Comandos de edición y estilos
+  history.js             Historial de cambios (deshacer/rehacer)
   fixer.js               Correcciones automáticas
   marker.js              Señalamiento de errores en el texto
   storage.js             Guardado local (IndexedDB)
@@ -98,9 +111,25 @@ tests/                   Pruebas y generadores de documentos de muestra
 inf/                     Documentación de trabajo del proyecto
 ```
 
+## Endpoints principales
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/health` | Estado del servicio y de la IA |
+| `GET` | `/rules` | Catálogo de reglas activas |
+| `POST` | `/api/analyze` | Analiza un `.docx` y devuelve el informe |
+| `POST` | `/api/docx-meta` | Geometría y formato de las secciones |
+| `POST` | `/api/report/docx` | Informe APA como `.docx` descargable |
+| `POST` | `/api/export` | `.docx` corregido con los IDs de reglas aplicados |
+| `POST` | `/api/ai/classify` | Segunda opinión por IA (solo lectura) |
+
 ## Limitación conocida
 
 El verificador analiza el `.docx` **original** que se abrió, no el estado
 editado en pantalla. Por eso el porcentaje de cumplimiento no baja al aplicar
-correcciones: las correcciones se aplican al documento del editor y las marcas
-se actualizan, pero la puntuación requiere volver a verificar el archivo.
+correcciones en el editor: las marcas sí se actualizan, pero la puntuación
+sigue reflejando el archivo de partida.
+
+Para obtener una puntuación actualizada hay que **exportar el documento
+corregido** (`/api/export`) y volver a abrir ese `.docx` nuevo en la
+aplicación.
