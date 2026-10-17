@@ -136,27 +136,26 @@ herramientas alrededor de la tesis que esté abierta.
          <div class="vcard">
            <span class="vcard-icn">${icon("search")}</span>
            <span class="vcard-body">
-             <span class="vcard-title">Verificar documento</span>
+             <span class="vcard-title">Verificar normas APA</span>
              <span class="vcard-text">Analiza la tesis contra las ${s.ruleCount} reglas APA y marca cada problema en el texto.</span>
-             <span class="vcard-actions"><button class="vbtn primary" data-act="analyze"${off}>Verificar</button></span>
+             <span class="vcard-actions">
+               <button class="vbtn primary" data-act="analyze"${off}>Verificar</button>
+               <button class="vbtn" data-act="detail"${off}>Panel de informe</button>
+             </span>
            </span>
          </div>
          <div class="vcard tone-purple">
            <span class="vcard-icn">${icon("spark")}</span>
            <span class="vcard-body">
              <span class="vcard-title">Revisión con IA</span>
-             <span class="vcard-text">Segunda opinión de estilo y redacción. No modifica el documento.</span>
+             <span class="vcard-text">Segunda opinión de estilo y redacción. Clasifica las referencias. No modifica el documento.</span>
              <span class="vcard-actions"><button class="vbtn" data-act="ai"${off}>Revisar con IA</button></span>
            </span>
          </div>
-       </div>
-
-       <div class="view-section-title">Corregir</div>
-       <div class="vgrid">
          <div class="vcard tone-ok">
            <span class="vcard-icn">${icon("wand")}</span>
            <span class="vcard-body">
-             <span class="vcard-title">Correcciones automáticas</span>
+             <span class="vcard-title">Corregir documento</span>
              <span class="vcard-text">Interlineado, espacios, sangrías, márgenes, ${"&"} en citas, orden de referencias y cursivas. Con vista previa y deshacer.</span>
              <span class="vcard-actions"><button class="vbtn primary" data-act="fix"${off}>Corregir</button></span>
            </span>
@@ -165,18 +164,50 @@ herramientas alrededor de la tesis que esté abierta.
            <span class="vcard-icn">${icon("clipboard")}</span>
            <span class="vcard-body">
              <span class="vcard-title">Señalamiento de errores</span>
-             <span class="vcard-text">Los errores, avisos y observaciones quedan resaltados dentro del texto. Al hacer clic se explica la regla.</span>
+             <span class="vcard-text">Resalta los errores en el texto y explica la regla al hacer clic. "Quitar marcas" solo borra los colores: no resuelve nada.</span>
              <span class="vcard-actions">
                <button class="vbtn" data-act="mark"${off}>Marcar ahora</button>
                <button class="vbtn" data-act="unmark">Quitar marcas</button>
              </span>
            </span>
          </div>
+       </div>
+
+       <div class="view-section-title">Páginas</div>
+       <div class="vgrid">
+         <div class="vcard">
+           <span class="vcard-icn">${icon("pageBreak")}</span>
+           <span class="vcard-body">
+             <span class="vcard-title">Salto de página</span>
+             <span class="vcard-text">Inserta un salto donde esté el cursor y reorganiza la paginación.</span>
+             <span class="vcard-actions"><button class="vbtn" data-act="pagebreak"${off}>Insertar salto</button></span>
+           </span>
+         </div>
+         <div class="vcard">
+           <span class="vcard-icn">${icon("ruler")}</span>
+           <span class="vcard-body">
+             <span class="vcard-title">Reorganizar páginas</span>
+             <span class="vcard-text">Vuelve a calcular las hojas tras editar. No cambia el texto.</span>
+             <span class="vcard-actions"><button class="vbtn" data-act="repaginate"${off}>Reorganizar</button></span>
+           </span>
+         </div>
+       </div>
+
+       <div class="view-section-title">Estilo APA</div>
+       <div class="vgrid">
+         <div class="vcard tone-error">
+           <span class="vcard-icn">${icon("docs")}</span>
+           <span class="vcard-body">
+             <span class="vcard-title">Aplicar formato base</span>
+             <span class="vcard-text">Pisa en todo el documento: Times New Roman 12, interlineado 2.0, alineado a la izquierda, sangría 1.27 cm y márgenes internos 0. Ojo: si tu fuente ya era válida en APA, esto te empeora el documento.</span>
+             <span class="vcard-actions"><button class="vbtn" data-act="apadefaults"${off}>Aplicar formato</button></span>
+           </span>
+         </div>
          <div class="vcard">
            <span class="vcard-icn">${icon("undo")}</span>
            <span class="vcard-body">
              <span class="vcard-title">Deshacer y rehacer</span>
-             <span class="vcard-text">Vuelve a un estado anterior del documento tras cualquier cambio o corrección.</span>
+             <span class="vcard-text">Vuelve a un estado anterior tras cualquier cambio, formato o corrección.</span>
              <span class="vcard-actions">
                <button class="vbtn" data-act="undo"${off}>Deshacer</button>
                <button class="vbtn" data-act="redo"${off}>Rehacer</button>
@@ -191,7 +222,7 @@ herramientas alrededor de la tesis que esté abierta.
            <span class="vcard-icn">${icon("save")}</span>
            <span class="vcard-body">
              <span class="vcard-title">Guardar en el navegador</span>
-             <span class="vcard-text">Conserva la sesión en este equipo para continuar más tarde, aunque cierres la página.</span>
+             <span class="vcard-text">Conserva la sesión en este equipo para continuar más tarde.</span>
              <span class="vcard-actions"><button class="vbtn primary" data-act="save"${off}>Guardar</button></span>
            </span>
          </div>
@@ -207,7 +238,7 @@ herramientas alrededor de la tesis que esté abierta.
            <span class="vcard-icn">${icon("chart")}</span>
            <span class="vcard-body">
              <span class="vcard-title">Informe en Word</span>
-             <span class="vcard-text">Resumen de cumplimiento, desglose por categoría y tabla de hallazgos en un documento.</span>
+             <span class="vcard-text">Resumen de cumplimiento, desglose por categoría y tabla de hallazgos.</span>
              <span class="vcard-actions"><button class="vbtn" data-act="report"${off}>Descargar informe</button></span>
            </span>
          </div>
@@ -330,6 +361,15 @@ herramientas alrededor de la tesis que esté abierta.
           app.mark();
         } else if (a === "unmark") {
           app.unmark();
+        } else if (a === "pagebreak") {
+          go("inicio");
+          app.pageBreak();
+        } else if (a === "repaginate") {
+          go("inicio");
+          app.repaginate();
+        } else if (a === "apadefaults") {
+          go("inicio");
+          app.apaDefaults();
         } else if (a === "undo") {
           app.undo();
         } else if (a === "redo") {

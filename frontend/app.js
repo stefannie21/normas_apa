@@ -977,6 +977,20 @@
     mark() {
       markInDocument();
     },
+    pageBreak() {
+      insertHtml('<div class="page-break"></div>');
+      repaginate();
+    },
+    repaginate() {
+      repaginate();
+    },
+    apaDefaults() {
+      applyApaDefaults();
+    },
+    toggleReport() {
+      if (reportPane.hidden) openPane();
+      else reportPane.hidden = true;
+    },
     unmark() {
       Marker.clear();
       showToast("Marcas quitadas", "ok");

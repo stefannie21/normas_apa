@@ -10,13 +10,25 @@ Menú lateral con cinco secciones:
 
 | Sección | Qué contiene |
 |---|---|
-| **Inicio** | El editor con su cinta de opciones (Inicio, Insertar, Revisar APA, Vista) |
+| **Inicio** | El editor con su cinta de opciones (Inicio, Insertar, Vista) |
 | **Mis Tesis** | Documento abierto y sesión guardada en el navegador |
-| **Correcciones** | Todo el proceso: verificar, revisar con IA, corregir, señalar, deshacer, guardar y descargar |
+| **Correcciones** | Todo el proceso de revisión: verificar, revisar con IA, corregir, señalar, páginas, formato y descarga |
 | **Reportes** | Puntaje, desglose y hallazgos por regla de la última verificación |
 | **Configuraciones** | Estado del servicio, vista y datos locales |
 
 El menú se pliega con el botón de su base para dejar todo el ancho al documento.
+
+Las acciones de revisión **no están en la cinta**: viven en la vista
+**Correcciones**, agrupadas en *Revisar* (verificar, IA, corregir, marcar),
+*Páginas* (salto y reorganizar), *Estilo APA* (formato base, deshacer) y
+*Guardar y entregar*.
+
+## Índice automático
+
+El índice solo se genera si el documento tiene **un salto de página** o un
+**título tipo "Índice"/"Contenido"**. Si no hay ninguno, el programa no inventa
+una portada de índice donde el autor no la puso; inserta el índice después del
+primer salto de página cuando existe.
 
 ## Qué hace
 

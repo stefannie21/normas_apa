@@ -84,35 +84,6 @@
       ],
     },
     {
-      id: "revisar",
-      label: "Revisar APA",
-      groups: [
-        {
-          label: "Revisión",
-          controls: [
-{ type: "action", action: "analyze", icon: "check", label: "Verificar normas APA", big: true, primary: true },
-            { type: "action", action: "ai-review", icon: "spark", label: "Revisión con IA", big: true },
-            { type: "action", action: "fix-doc", icon: "fix", label: "Corregir documento", big: true },
-            { type: "action", action: "toggle-pane", icon: "panel", label: "Panel de informe" },
-            { type: "action", action: "clear-marks", icon: "paint", label: "Quitar marcas" },
-          ],
-        },
-{
-          label: "Páginas",
-          controls: [
-            { type: "action", action: "page-break", icon: "pageBreak", label: "Salto de página" },
-            { type: "action", action: "repaginate", icon: "ruler", label: "Reorganizar páginas", big: true },
-          ],
-        },
-        {
-          label: "Estilo APA",
-          controls: [
-            { type: "action", action: "apa-defaults", icon: "docs", label: "Aplicar formato base" },
-          ],
-        },
-      ],
-    },
-    {
       id: "vista",
       label: "Vista",
       groups: [
