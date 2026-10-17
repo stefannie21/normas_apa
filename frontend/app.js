@@ -937,106 +937,11 @@
       updateTocPages();
       updateCountsDebounced();
     },
-
-    /* ---------- API para el menú lateral ---------- */
-    state() {
-      const counts = countBy(allFindings);
-      const byRule = {};
-      allFindings.forEach((f) => {
-        byRule[f.rule_id] = (byRule[f.rule_id] || 0) + 1;
-      });
-      const text = (Pager.textOf(page) || "").trim();
-      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-      return {
-        name: currentFile ? currentFile.name : "",
-        pages: totalPages || page.querySelectorAll(".sheet").length,
-        words,
-        dirty,
-        savedAt: lastSavedAt || "",
-        score:
-          lastSummary && lastSummary.compliance_score != null
-            ? lastSummary.compliance_score
-            : null,
-        counts,
-        byRule,
-        ruleCount: RULE_COUNT,
-      };
-    },
-    pickFile() {
-      fileInput.click();
-    },
-    analyze() {
-      runAnalysis();
-    },
-    aiReview() {
-      runAiReview();
-    },
-    fix() {
-      openFixModal();
-    },
-    mark() {
-      markInDocument();
-    },
-    pageBreak() {
-      insertHtml('<div class="page-break"></div>');
-      repaginate();
-    },
-    repaginate() {
-      repaginate();
-    },
-    apaDefaults() {
-      applyApaDefaults();
-    },
-    toggleReport() {
-      if (reportPane.hidden) openPane();
-      else reportPane.hidden = true;
-    },
-    unmark() {
-      Marker.clear();
-      showToast("Marcas quitadas", "ok");
-    },
-    undo() {
-      if (window.History) History.undo();
-    },
-    redo() {
-      if (window.History) History.redo();
-    },
-    save() {
-      saveSession(false);
-    },
-    exportDocx() {
-      downloadCorrectedDocx();
-    },
-    exportReport() {
-      downloadReportDocx();
-    },
-    openReport() {
-      if (reportPane.hidden) openPane();
-    },
-    toggleRibbon() {
-      setRibbonCollapsed(!ribbonNav.classList.contains("is-collapsed"));
-    },
-    wipe() {
-      SessionStore.clear().then(() => {
-        showToast("Sesión guardada borrada", "ok");
-      });
-    },
   };
 
   /* ---------- Guardar la sesion ---------- */
   const saveBtn = document.getElementById("save-btn");
   let dirty = false;
-  let lastSavedAt = ""; // ISO de la ultima vez que se guardo en este navegador
-  // total de reglas que declara el backend; lo consulta una vez al arrancar
-  let RULE_COUNT = 0;
-  fetch("/api/rules")
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => {
-      if (d && Array.isArray(d.rules)) RULE_COUNT = d.rules.length;
-    })
-    .catch(() => {
-      /* sin conexion: se queda en 0 y la vista lo muestra como desconocido */
-    });
 
   function markDirty(value) {
     dirty = value;
@@ -1064,7 +969,6 @@
     };
     try {
       await SessionStore.save(doc);
-      lastSavedAt = doc.savedAt;
       markDirty(false);
     } catch (e) {
       /* error al guardar en IndexedDB no bloquea la descarga */
@@ -1210,7 +1114,6 @@
       resetReport();
       updateCounts();
       markDirty(false);
-      lastSavedAt = doc.savedAt || "";
       History.reset();
       const when = new Date(doc.savedAt).toLocaleString("es", {
         day: "2-digit",
