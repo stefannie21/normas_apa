@@ -2,6 +2,15 @@
 (function () {
   "use strict";
   const ICONS = {
+    // menú lateral
+    cap: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.5"/>',
+    home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M10 19v-5h4v5"/>',
+    files: '<path d="M8 3h9l4 4v14H8z"/><path d="M17 3v4h4"/><path d="M4 7v14h11"/>',
+    wand: '<path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/><path d="M4 5h4"/><path d="M4 9h3"/>',
+    chart: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
+    chevron: '<path d="M14 6l-6 6 6 6"/>',
+    download: '<path d="M12 4v10"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
     save: '<path d="M5 4h11l3 3v13H5z"/><path d="M15 4v4h4"/><path d="M8 20v-6h8v6"/>',
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     search: '<circle cx="11" cy="11" r="6"/><line x1="16" y1="16" x2="21" y2="21"/>',

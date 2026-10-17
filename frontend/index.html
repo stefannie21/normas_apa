@@ -8,6 +8,43 @@
 </head>
 <body>
   <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-brand">
+        <span class="sb-logo" data-icon="cap"></span>
+        <span class="sb-brand-text">
+          <strong>TesisPro</strong>
+          <small>Sistema de correcci&oacute;n de tesis</small>
+        </span>
+      </div>
+
+      <nav class="sb-nav" id="sb-nav">
+        <button class="sb-item is-active" data-view="inicio">
+          <span data-icon="home"></span><span>Inicio</span>
+        </button>
+        <button class="sb-item" data-view="tesis">
+          <span data-icon="files"></span><span>Mis Tesis</span>
+        </button>
+        <button class="sb-item" data-view="correcciones">
+          <span data-icon="wand"></span><span>Correcciones</span>
+        </button>
+        <button class="sb-item" data-view="reportes">
+          <span data-icon="chart"></span><span>Reportes</span>
+        </button>
+        <button class="sb-item" data-view="ajustes">
+          <span data-icon="gear"></span><span>Configuraciones</span>
+        </button>
+      </nav>
+
+      <button class="sb-card" id="sb-collapse" title="Ocultar el men&uacute;">
+        <span class="sb-card-icn" data-icon="chevron"></span>
+        <span class="sb-card-text">
+          <strong>Ocultar men&uacute;</strong>
+          <small>Amplia el &aacute;rea de edici&oacute;n</small>
+        </span>
+      </button>
+    </aside>
+
+    <div class="sb-main">
     <header class="titlebar">
       <div class="titlebar-left">
         <div class="brand">
@@ -89,6 +126,10 @@
       </aside>
     </main>
 
+    <section class="view" id="view" hidden>
+      <div class="view-inner" id="view-inner"></div>
+    </section>
+
     <footer class="statusbar">
       <div class="status-left">
         <span id="status-pages">Página 1 de 1</span>
@@ -108,6 +149,7 @@
         </div>
       </div>
     </footer>
+    </div>
   </div>
 
   <div class="toast" id="toast" hidden></div>
@@ -154,6 +196,7 @@
   <script src="/static/fixer.js"></script>
   <script src="/static/marker.js"></script>
   <script src="/static/ribbon.js"></script>
+  <script src="/static/sidebar.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

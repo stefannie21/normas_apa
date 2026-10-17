@@ -4,6 +4,20 @@ Sistema web para una empresa de asesoramiento de tesis: se abre un documento
 (tesis o proyecto de tesis en formato `.docx`), se edita en un visor tipo Word y
 se verifica su cumplimiento con las **normas APA (7.ª edición)**.
 
+## Interfaz
+
+Menú lateral con cinco secciones:
+
+| Sección | Qué contiene |
+|---|---|
+| **Inicio** | El editor con su cinta de opciones (Inicio, Insertar, Revisar APA, Vista) |
+| **Mis Tesis** | Documento abierto y sesión guardada en el navegador |
+| **Correcciones** | Todo el proceso: verificar, revisar con IA, corregir, señalar, deshacer, guardar y descargar |
+| **Reportes** | Puntaje, desglose y hallazgos por regla de la última verificación |
+| **Configuraciones** | Estado del servicio, vista y datos locales |
+
+El menú se pliega con el botón de su base para dejar todo el ancho al documento.
+
 ## Qué hace
 
 - **Verifica** el documento contra 30 reglas programadas (formato de página,
@@ -100,6 +114,7 @@ frontend/
   app.js                 Lógica de la app (carga, edición, informe, correcciones)
   pager.js               Paginación tipo Word
   ribbon.js              Ribbon (Inicio, Insertar, Revisar APA, Vista)
+  sidebar.js             Menú lateral y vistas
   commands.js            Comandos de edición y estilos
   history.js             Historial de cambios (deshacer/rehacer)
   fixer.js               Correcciones automáticas
