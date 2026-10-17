@@ -61,6 +61,25 @@ body {
 .app.sb-hidden .sb-nav,
 .app.sb-hidden .sb-card { opacity: 0; pointer-events: none; }
 
+/* Botón para recuperar el menú cuando está plegado */
+.sb-show {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  margin-right: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+}
+.sb-show:hover { background: var(--accent-soft); border-color: var(--accent); }
+.sb-show [data-icon] svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.app.sb-hidden .sb-show { display: inline-flex; }
+
 .sb-brand { display: flex; align-items: center; gap: 11px; padding: 0 6px; }
 .sb-logo {
   width: 38px;

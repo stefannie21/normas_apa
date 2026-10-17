@@ -377,19 +377,31 @@ herramientas alrededor de la tesis que esté abierta.
   }
 
   function toggleMenu() {
+    // si esta oculto se muestra, y al reves: el valor actual decide el destino
+    setMenu(document.querySelector(".app").classList.contains("sb-hidden"));
+  }
+
+  function setMenu(show) {
     const appEl = document.querySelector(".app");
     if (!appEl) return;
-    const hidden = appEl.classList.toggle("sb-hidden");
+    appEl.classList.toggle("sb-hidden", !show);
     try {
-      localStorage.setItem("apa.menu.hidden", hidden ? "1" : "0");
+      localStorage.setItem("apa.menu.hidden", show ? "0" : "1");
     } catch (e) {
       /* modo privado */
     }
+    const label = show ? "Ocultar menú" : "Mostrar menú";
     const btn = document.getElementById("sb-collapse");
     if (btn) {
       const t = btn.querySelector("strong");
-      if (t) t.textContent = hidden ? "Mostrar menú" : "Ocultar menú";
+      if (t) t.textContent = label;
+      const s = btn.querySelector("small");
+      if (s) s.textContent = show ? "Amplía el área de edición" : "Volver a mostrar el menú";
+      btn.querySelector("[data-icon]")?.setAttribute("data-icon", show ? "chevron" : "menu");
+      if (window.Icons) window.Icons.hydrate(btn);
     }
+    const showBtn = document.getElementById("sb-show");
+    if (showBtn) showBtn.title = show ? "Menú visible" : "Mostrar el menú";
   }
 
   /* ---------- Arranque ---------- */
@@ -408,17 +420,16 @@ herramientas alrededor de la tesis que esté abierta.
     const card = $("sb-collapse");
     if (card) card.addEventListener("click", toggleMenu);
 
+    const showBtn = $("sb-show");
+    if (showBtn) showBtn.addEventListener("click", () => setMenu(true));
+
     try {
-      if (localStorage.getItem("apa.menu.hidden") === "1" && document.querySelector(".app")) {
-        document.querySelector(".app").classList.add("sb-hidden");
-        const t = card && card.querySelector("strong");
-        if (t) t.textContent = "Mostrar menú";
-      }
+      if (localStorage.getItem("apa.menu.hidden") === "1") setMenu(false);
     } catch (e) {
       /* sin persistencia */
     }
     go("inicio");
   }
 
-  window.Sidebar = { init, go, current: () => current };
+  window.Sidebar = { init, go, setMenu, current: () => current };
 })();
