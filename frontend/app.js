@@ -937,11 +937,43 @@
       updateTocPages();
       updateCountsDebounced();
     },
+
+    /* ---------- Estado para el panel de Inicio ---------- */
+    state() {
+      const text = (Pager.textOf(page) || "").trim();
+      return {
+        name: currentFile ? currentFile.name : "",
+        pages: totalPages || page.querySelectorAll(".sheet").length,
+        words: text ? text.split(/\s+/).filter(Boolean).length : 0,
+        dirty,
+        savedAt: lastSavedAt || "",
+        score:
+          lastSummary && lastSummary.compliance_score != null
+            ? lastSummary.compliance_score
+            : null,
+        counts: countBy(allFindings),
+        ruleCount: RULE_COUNT,
+      };
+    },
+    pickFile() {
+      fileInput.click();
+    },
   };
 
   /* ---------- Guardar la sesion ---------- */
   const saveBtn = document.getElementById("save-btn");
   let dirty = false;
+  let lastSavedAt = ""; // ISO de la ultima vez que se guardo en este navegador
+  // total de reglas que declara el backend; se consulta una vez al arrancar
+  let RULE_COUNT = 0;
+  fetch("/api/rules")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (d && Array.isArray(d.rules)) RULE_COUNT = d.rules.length;
+    })
+    .catch(() => {
+      /* sin conexion: el panel mostrara "?" */
+    });
 
   function markDirty(value) {
     dirty = value;
@@ -969,6 +1001,7 @@
     };
     try {
       await SessionStore.save(doc);
+      lastSavedAt = doc.savedAt;
       markDirty(false);
     } catch (e) {
       /* error al guardar en IndexedDB no bloquea la descarga */
@@ -1114,6 +1147,7 @@
       resetReport();
       updateCounts();
       markDirty(false);
+      lastSavedAt = doc.savedAt || "";
       History.reset();
       const when = new Date(doc.savedAt).toLocaleString("es", {
         day: "2-digit",

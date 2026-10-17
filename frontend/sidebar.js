@@ -1,8 +1,11 @@
 /* Menú lateral.
 
-Solo la navegación: cada sección abre un área de trabajo distinta sobre el
-mismo editor. El contenido de cada vista se decide más adelante, así que aquí
-no se inventa nada: se muestra únicamente el encabezado de la sección.
+- Inicio      -> panel de situación (lo que hay ahora mismo en el editor)
+- Correcciones-> el editor con su cinta de opciones
+- Las demás secciones están vacías a la espera de decidir su contenido.
+
+Nada de lo que se muestra es inventado: todo sale del estado real del
+documento abierto y del último análisis.
 */
 (function () {
   "use strict";
@@ -12,6 +15,8 @@ no se inventa nada: se muestra únicamente el encabezado de la sección.
   let inner = null;
   let nav = null;
   let current = "inicio";
+
+  const EDITOR = "correcciones";
 
   const TITLES = {
     inicio: { icon: "home", t: "Inicio", s: "" },
@@ -35,6 +40,10 @@ no se inventa nada: se muestra únicamente el encabezado de la sección.
     return `<span data-icon="${name}"></span>`;
   }
 
+  function s() {
+    return app && app.state ? app.state() : {};
+  }
+
   /* ---------- Cambio de vista ---------- */
   function go(name) {
     current = name;
@@ -43,7 +52,7 @@ no se inventa nada: se muestra únicamente el encabezado de la sección.
         b.classList.toggle("is-active", b.dataset.view === name);
       });
     }
-    const editor = name === "inicio";
+    const editor = name === EDITOR;
     const ribbon = $("ribbon");
     const ws = document.querySelector(".workspace");
     const bar = document.querySelector(".statusbar");
@@ -54,16 +63,160 @@ no se inventa nada: se muestra únicamente el encabezado de la sección.
     if (view) {
       view.hidden = editor;
       if (!editor) {
-        const t = TITLES[name];
-        inner.innerHTML =
-          `<div class="view-head">
-             <h1>${icon(t.icon)}${esc(t.t)}</h1>
-           </div>
-           <div class="vempty">Esta seccion todavia no tiene contenido.</div>`;
+        inner.innerHTML = name === "inicio" ? renderInicio() : renderVacio(name);
         if (window.Icons) window.Icons.hydrate(inner);
+        if (name === "inicio") bindInicio();
       }
     }
     document.title = (TITLES[name] ? TITLES[name].t + " · " : "") + "APA Studio";
+  }
+
+  function renderVacio(name) {
+    const t = TITLES[name];
+    return `<div class="view-head"><h1>${icon(t.icon)}${esc(t.t)}</h1></div>
+      <div class="vempty">Esta seccion todavia no tiene contenido.</div>`;
+  }
+
+  /* ---------- Panel de Inicio ---------- */
+  function renderInicio() {
+    const st = s();
+    const c = st.counts || {};
+    const conDoc = !!st.name;
+
+    const stat = (tone, ico, num, label, pie) => `
+      <div class="stat ${tone}">
+        <span class="stat-icn">${icon(ico)}</span>
+        <span class="stat-num">${esc(num)}</span>
+        <span class="stat-label">${esc(label)}</span>
+        <button class="stat-link" data-go="${EDITOR}">Abrir editor</button>
+      </div>`;
+
+    const cumplimiento = st.score != null ? st.score + " %" : "—";
+    const err = c.error != null ? c.error : "—";
+    const avis = c.warning != null ? c.warning : "—";
+
+    const documento = conDoc
+      ? `<div class="doc-item">
+           <span class="doc-icn">${icon("docs")}</span>
+           <span class="doc-body">
+             <span class="doc-name">${esc(st.name)}</span>
+             <span class="doc-meta">${st.pages} páginas · ${st.words.toLocaleString("es")} palabras${st.savedAt ? " · guardado el " + esc(fecha(st.savedAt)) : " · sin guardar"}${st.dirty ? " · <b>cambios sin guardar</b>" : ""}</span>
+           </span>
+           <span class="doc-estado ${st.dirty ? "pendiente" : "ok"}">${st.dirty ? "Cambios sin guardar" : "Guardado"}</span>
+         </div>`
+      : `<div class="vempty">No hay ninguna tesis abierta.<br>
+           Usa <b>Abrir</b> para cargar un archivo <b>.docx</b>.</div>`;
+
+    return `
+      <div class="dash">
+        <div class="dash-main">
+
+          <section class="hero">
+            <div class="hero-text">
+              <h1>Tu tesis, en mejores manos</h1>
+              <p>Abre tu proyecto de tesis, verifica el cumplimiento de las normas
+                 APA (7.ª edición) y corrige de forma automática lo que se puede
+                 corregir sin criterio humano.</p>
+              <button class="hero-btn" data-act="open">${icon("folder")} Abrir tesis .docx</button>
+            </div>
+            <span class="hero-art">${icon("cap")}</span>
+          </section>
+
+          <section class="stats">
+            ${stat("", "docs", conDoc ? "1" : "0", "Tesis abierta", conDoc)}
+            ${stat("ok", "chart", cumplimiento, "Nivel de cumplimiento", conDoc)}
+            ${stat("error", "search", err, "Errores", conDoc)}
+            ${stat("warning", "clipboard", avis, "Avisos", conDoc)}
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>${icon("docs")} Tu tesis</h2>
+              <button class="card-link" data-go="${EDITOR}">Ir al editor</button>
+            </div>
+            ${documento}
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>${icon("check")} Cómo funciona</h2></div>
+            <ol class="pasos">
+              <li><b>Abre</b> tu archivo .docx en el editor, con su cinta de opciones.</li>
+              <li><b>Verifica</b> contra las ${esc(st.ruleCount || "?")} reglas de las normas APA 7.</li>
+              <li><b>Corrige</b> de forma automática el formato y la puntuación, y resuelve a mano lo demás.</li>
+              <li><b>Descarga</b> la tesis corregida en .docx, o el informe en Word.</li>
+            </ol>
+          </section>
+        </div>
+
+        <aside class="dash-side">
+          <section class="card">
+            <div class="card-head"><h2>${icon("spark")} Revisión con IA</h2></div>
+            <p class="card-text">Como segunda opinión, la IA clasifica las referencias y
+               detecta detalles de estilo y redacción. <b>Nunca escribe en el documento.</b></p>
+            <ul class="check">
+              <li>Ortografía y gramática</li>
+              <li>Coherencia y estructura</li>
+              <li>Estilo académico</li>
+              <li>Citas y referencias</li>
+            </ul>
+            <p class="card-note" id="dash-ai">Comprobando el estado del servicio…</p>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>${icon("spark")} Consejos rápidos</h2></div>
+            <ul class="tips">
+              <li>Usa palabras clave relevantes en la introducción.</li>
+              <li>Revisa la coherencia entre objetivos, metodología y conclusiones.</li>
+              <li>Evita el uso excesivo de citas textuales.</li>
+              <li>Mantén un estilo de redacción claro y formal.</li>
+            </ul>
+          </section>
+        </aside>
+      </div>`;
+  }
+
+  function fecha(iso) {
+    try {
+      return new Date(iso).toLocaleString("es", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /* ---------- Acciones del panel ---------- */
+  function bindInicio() {
+    inner.querySelectorAll("[data-act]").forEach((b) => {
+      b.addEventListener("click", () => {
+        if (b.dataset.act === "open") {
+          if (app.pickFile) app.pickFile();
+        }
+      });
+    });
+    inner.querySelectorAll("[data-go]").forEach((b) => {
+      b.addEventListener("click", () => go(b.dataset.go));
+    });
+    loadHealth();
+  }
+
+  function loadHealth() {
+    const el = $("dash-ai");
+    if (!el) return;
+    fetch("/api/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h) => {
+        if (!h) throw new Error("sin respuesta");
+        el.textContent = h.ai_enabled
+          ? "Activa (" + (h.ai_provider || "") + " · " + (h.ai_model || "") + ")"
+          : "No activada: falta configurar la clave en .env";
+      })
+      .catch(() => {
+        el.textContent = "No se pudo contactar con el servidor";
+      });
   }
 
   /* ---------- Menú plegado ---------- */
@@ -86,8 +239,8 @@ no se inventa nada: se muestra únicamente el encabezado de la sección.
     if (btn) {
       const t = btn.querySelector("strong");
       if (t) t.textContent = label;
-      const s = btn.querySelector("small");
-      if (s) s.textContent = show ? "Amplía el área de edición" : "Volver a mostrar el menú";
+      const s2 = btn.querySelector("small");
+      if (s2) s2.textContent = show ? "Amplía el área de edición" : "Volver a mostrar el menú";
       btn.querySelector("[data-icon]")?.setAttribute("data-icon", show ? "chevron" : "menu");
       if (window.Icons) window.Icons.hydrate(btn);
     }

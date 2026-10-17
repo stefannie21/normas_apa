@@ -6,15 +6,17 @@ se verifica su cumplimiento con las **normas APA (7.ª edición)**.
 
 ## Interfaz
 
-Menú lateral con cinco secciones: **Inicio**, **Mis tesis**, **Correcciones**,
-**Reportes** y **Configuraciones**.
+Menú lateral con cinco secciones.
 
-- **Inicio** es el editor con su cinta de opciones (Inicio, Insertar, Revisar
-  APA y Vista).
-- Las otras cuatro secciones están preparadas pero **sin contenido**: todavía no
-  se ha decidido qué va en cada una.
+- **Inicio** es un panel de situación: la tesis abierta, su nivel de
+  cumplimiento, los errores y avisos del último análisis, cómo funciona el
+  proceso y el estado de la revisión con IA.
+- **Correcciones** es el editor: la cinta de opciones (Inicio, Insertar, Revisar
+  APA y Vista), el documento paginado y la barra de estado.
+- **Mis tesis**, **Reportes** y **Configuraciones** están preparadas pero **sin
+  contenido**: todavía no se ha decidido qué va en cada una.
 
-El menú se plega con el botón de su base y se recupera con el botón de la barra
+El menú se pliega con el botón de su base y se recupera con el botón de la barra
 de título.
 
 ## Índice automático
