@@ -31,7 +31,7 @@ function register(name, spec) {
 function syncNav(name) {
   if (!nav) return;
   nav.querySelectorAll(".sb-item").forEach((b) => {
-    b.classList.toggle("is-active", b.dataset.view === name);
+    b.classList.toggle("active", b.dataset.view === name);
   });
 }
 
@@ -84,8 +84,8 @@ function buildNav() {
   nav.innerHTML = list
     .map((name) => {
       const v = views[name];
-      return `<button class="sb-item" data-view="${name}">
-        <span data-icon="${v.icon || "docs"}"></span><span>${Dom.esc(v.title)}</span>
+      return `<button class="sb-item" data-view="${name}" title="${Dom.esc(v.title)}">
+        <span class="sb-icn" data-icon="${v.icon || "docs"}"></span><span class="sb-label">${Dom.esc(v.title)}</span>
       </button>`;
     })
     .join("");

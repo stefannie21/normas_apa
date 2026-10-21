@@ -118,20 +118,24 @@ const Pager = (function () {
 
   // Escala una imagen para que quepa dentro del area util de la hoja (como Word).
   function scaleImage(img, g) {
-    const natW = img.naturalWidth || img.width || 0;
-    const natH = img.naturalHeight || img.height || 0;
-    if (!natW || !natH) return false;
+    // El tamaño con el que el autor colocó la imagen en Word MANDA sobre sus
+    // píxeles naturales. Mammoth no traslada <wp:extent> al HTML, así que sin
+    // esto una figura declarada a 6 cm se pintaba ocupando toda la caja de
+    // texto (y una captura de pantalla, mas grande todavia).
+    const CM = 96 / 2.54;
+    const declW = Number(img.dataset.docxW || 0);
+    const declH = Number(img.dataset.docxH || 0);
+    const pxW = img.naturalWidth || img.width || 0;
+    const pxH = img.naturalHeight || img.height || 0;
+    let w = declW > 0 ? declW * CM : pxW;
+    let h = declH > 0 ? declH * CM : pxH;
+    if (!w || !h) return false;
+    // no se agranda mas alla de la resolucion real: solo se deforma hacia abajo
+    if (pxW && w > pxW) { h = (h * pxW) / w; w = pxW; }
+    const ratio = h / w;
     const before = img.style.width + "x" + img.style.height;
-    let w = natW;
-    let h = natH;
-    if (w > g.contentW) {
-      w = g.contentW;
-      h = (natH * g.contentW) / natW;
-    }
-    if (h > g.contentH) {
-      h = g.contentH;
-      w = (natW * g.contentH) / natH;
-    }
+    if (w > g.contentW) { w = g.contentW; h = w * ratio; }
+    if (h > g.contentH) { h = g.contentH; w = h / ratio; }
     const newW = Math.max(40, Math.round(w));
     const newH = Math.max(40, Math.round(h));
     img.style.width = newW + "px";

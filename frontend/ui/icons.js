@@ -47,6 +47,13 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     ruler: '<rect x="3" y="8" width="18" height="8" rx="1"/><line x1="7" y1="8" x2="7" y2="12"/><line x1="11" y1="8" x2="11" y2="13"/><line x1="15" y1="8" x2="15" y2="12"/><line x1="19" y1="8" x2="19" y2="13"/>',
     pilcrow: '<path d="M13 4v16"/><path d="M9 4h8"/><path d="M9 4a4 4 0 0 0 0 8h4"/>',
     paint: '<path d="M5 9a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v1H5z"/><path d="M12 10v6"/><rect x="10" y="16" width="4" height="5" rx="1"/>',
+    /* Iconos del menu lateral */
+    home: '<path d="M4 11.2 12 4l8 7.2"/><path d="M6 10v9.5h12V10"/><path d="M10 19.5v-5h4v5"/>',
+    stack: '<path d="M8 3h9l-3 3.6"/><path d="M8 3 3 8.2l3 3.6"/><path d="M3 8.2v4.4l5 5 5-5V8.2"/><path d="M8 17.6v3.6l5 2.4 5-2.4v-3.6"/><path d="M13 17.6v3.6"/>',
+    chart: '<line x1="4" y1="20" x2="20" y2="20"/><rect x="5.5" y="12" width="3.5" height="6"/><rect x="10.2" y="8" width="3.5" height="10"/><rect x="15" y="4" width="3.5" height="14"/>',
+    gear: '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 12H2.1M21.9 12h-2.4"/><path d="m6.7 6.7 1.7 1.7M15.6 15.6l1.7 1.7M17.3 6.7l-1.7 1.7M8.4 15.6l-1.7 1.7"/>',
+    wand: '<path d="M15.5 4.5 19.5 8.5"/><path d="M13.4 6.6 4 16v4h4l9.4-9.4z"/><path d="M6 3v3M4.5 4.5h3"/><path d="M18 15v3M16.5 16.5h3"/>',
+    download: '<circle cx="12" cy="14" r="7.6"/><line x1="12" y1="2.6" x2="12" y2="14.2"/><path d="M7.6 10.2 12 14.6l4.4-4.4"/>',
   };
 
   function svg(name) {

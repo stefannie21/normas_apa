@@ -36,11 +36,15 @@ const Marker = (function () {
       parent.removeChild(m);
       parent.normalize();
     });
-    // Los parrafos marcados en el margen llevan la clase de gravedad
-    // (apa-mark-error / warning / info), que es la que pinta el fondo. Si solo
-    // se quita "apa-flagged" el parrafo se queda con el color puesto.
     p.querySelectorAll(".apa-flagged").forEach((el) => {
-      el.classList.remove("apa-flagged", "apa-mark-error", "apa-mark-warning", "apa-mark-info");
+      el.classList.remove(
+        "apa-flagged",
+        "apa-mark-error",
+        "apa-mark-warning",
+        "apa-mark-info"
+      );
+      delete el.dataset.fids;
+      delete el.dataset.sev;
     });
     // por si quedo alguna clase de gravedad suelta en el documento
     p.querySelectorAll(".apa-mark-error, .apa-mark-warning, .apa-mark-info").forEach(
@@ -121,10 +125,35 @@ const Marker = (function () {
     return sev === "error" ? 3 : sev === "warning" ? 2 : 1;
   }
 
+  /* ---------- Clic delegado ----------
+     Los escuchadores se ponen en #page y no en cada marca. Al repaginar, el
+     paginador CLONA los parrafos que se parten entre hojas, y un clon no
+     arrastra los addEventListener: la marca se quedaba visible pero sin
+     responder al clic. Con delegacion en el ancestro eso ya no puede pasar. */
+  let listening = false;
+
+  function listen() {
+    const p = root();
+    if (listening || !p) return;
+    listening = true;
+    p.addEventListener("click", (e) => {
+      const target = e.target.closest(".apa-mark, .apa-flagged");
+      if (target) onMarkClick(e, target);
+    });
+    p.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const target = e.target.closest(".apa-mark, .apa-flagged");
+      if (!target) return;
+      e.preventDefault();
+      onMarkClick(e, target);
+    });
+  }
+
   function apply(findings) {
     clear();
     const p = root();
     if (!p) return { marks: 0, blocks: 0, unmatched: 0 };
+    listen();
     registry.clear();
     let marks = 0;
     let blocksFlagged = 0;
@@ -144,21 +173,22 @@ const Marker = (function () {
         span = wrapText(el, f.excerpt.slice(0, 60), cls, f, i);
       }
       if (!span) {
-        // sin fragmento localizable: se marca el parrafo entero en el margen
+        // sin fragmento localizable: se marca el parrafo entero en el margen.
+        // Tambien debe responder al clic (si no, el aviso queda muerto).
         el.classList.add("apa-flagged", cls);
+        el.dataset.fids = el.dataset.fids ? el.dataset.fids + "," + i : String(i);
+        if (rank(f.severity || "info") > rank(el.dataset.sev)) {
+          el.dataset.sev = f.severity || "info";
+          el.classList.remove("apa-mark-error", "apa-mark-warning", "apa-mark-info");
+          el.classList.add(SEV[f.severity] || SEV.info);
+        }
+        el.tabIndex = 0;
         if (!flagged.has(el)) {
           flagged.add(el);
           blocksFlagged++;
         }
       } else {
         marks++;
-        span.addEventListener("click", onMarkClick);
-        span.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onMarkClick(e);
-          }
-        });
       }
     });
 
@@ -188,10 +218,9 @@ const Marker = (function () {
     return d.innerHTML;
   }
 
-  function onMarkClick(e) {
+  function onMarkClick(e, el) {
     e.preventDefault();
     e.stopPropagation();
-    const el = e.currentTarget;
     close();
     const fids = (el.dataset.fids || "")
       .split(",")
@@ -204,8 +233,13 @@ const Marker = (function () {
       list.find((f) => f.severity === "error") ||
       list.find((f) => f.severity === "warning") ||
       list[0];
-    const isAuto =
-      uniqueRules.some((r) => Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
+    const isAuto = uniqueRules.some((r) => Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
+    const applicable = Fixer.CORRECTIONS.filter((c) =>
+      uniqueRules.some((r) => c.rules.includes(r))
+    );
+    // si TODAS las correcciones posibles son de documento (margenes, ordenar
+    // referencias) el boton lo dice, para no prometer una correccion local
+    const docScope = applicable.length > 0 && applicable.every((c) => c.scope === "doc");
     const label =
       sev.severity === "error" ? "Error" : sev.severity === "warning" ? "Alerta" : "Observación";
 
@@ -227,7 +261,9 @@ const Marker = (function () {
        <div class="apa-pop-foot">
          ${
            isAuto
-             ? '<button class="apa-pop-fixbtn">Corregir esto</button>'
+             ? `<button class="apa-pop-fixbtn">${
+                  docScope ? "Corregir en todo el documento" : "Corregir esto"
+                }</button>`
              : '<button class="apa-pop-report">Ver en el informe</button>'
          }
          <button class="apa-pop-close">Cerrar</button>
@@ -252,11 +288,17 @@ const Marker = (function () {
         const items = Fixer.CORRECTIONS.filter((c) =>
           uniqueRules.some((r) => c.rules.includes(r))
         );
+        // el ambito es el bloque que contiene la marca: corregir un aviso no
+        // debe arrastrar al resto del documento ni tapar los demas avisos
+        const blockEl = el.classList.contains("apa-flagged")
+          ? el
+          : el.closest(SEL) || el;
         const res = Fixer.applySelected(items, {
           sections: hooks.sections(),
+          el: blockEl,
         });
         close();
-        hooks.afterFix(res);
+        hooks.afterFix(res, list);
       });
     }
     const repBtn = pop.querySelector(".apa-pop-report");
@@ -269,8 +311,11 @@ const Marker = (function () {
   }
 
   document.addEventListener("click", (e) => {
-    if (pop && !pop.contains(e.target) && !e.target.classList.contains("apa-mark"))
-      close();
+    if (!pop) return;
+    if (pop.contains(e.target)) return;
+    // pulsar otra marca no puede cerrar el globito recien abierto
+    if (e.target.closest && e.target.closest(".apa-mark, .apa-flagged")) return;
+    close();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") close();

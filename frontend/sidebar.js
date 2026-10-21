@@ -1,50 +1,52 @@
 /* Menú lateral: solo plegado y despliegue. Las secciones viven en views/ y las
-   maneja core/router.js. */
-import { Dom } from "./core/dom.js";
-import { Icons } from "./ui/icons.js";
+   maneja core/router.js.
 
-const { $ } = Dom;
+   Plegado no es "ocultar": el menú se queda en una franja de iconos, de modo que
+   siempre hay un sitio visible donde volver a desplegarlo. El estado se recuerda
+   entre recargas. */
+const Sidebar = (function () {
+  "use strict";
 
-function toggleMenu() {
-  // si esta oculto se muestra, y al reves: el valor actual decide el destino
-  setMenu(document.querySelector(".app").classList.contains("sb-hidden"));
-}
+  const KEY = "apa.sidebar.collapsed";
 
-function setMenu(show) {
-  const appEl = document.querySelector(".app");
-  if (!appEl) return;
-  appEl.classList.toggle("sb-hidden", !show);
-  try {
-    localStorage.setItem("apa.menu.hidden", show ? "0" : "1");
-  } catch (e) {
-    /* modo privado */
+  function setCollapsed(collapsed) {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.toggle("is-collapsed", collapsed);
+
+    const toggle = document.getElementById("sb-collapse");
+    if (toggle) {
+      toggle.title = collapsed ? "Desplegar el menú" : "Plegar el menú";
+      toggle.setAttribute("aria-label", toggle.title);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+
+    try {
+      localStorage.setItem(KEY, collapsed ? "1" : "0");
+    } catch (e) {
+      /* modo privado: el plegado dura solo esta sesion */
+    }
   }
-  const label = show ? "Ocultar menú" : "Mostrar menú";
-  const btn = $("sb-collapse");
-  if (btn) {
-    const t = btn.querySelector("strong");
-    if (t) t.textContent = label;
-    const s2 = btn.querySelector("small");
-    if (s2) s2.textContent = show ? "Amplía el área de edición" : "Volver a mostrar el menú";
-    btn.querySelector("[data-icon]")?.setAttribute("data-icon", show ? "chevron" : "menu");
-    Icons.hydrate(btn);
+
+  function toggle() {
+    const sidebar = document.getElementById("sidebar");
+    if (!sidebar) return;
+    setCollapsed(!sidebar.classList.contains("is-collapsed"));
   }
-  const showBtn = $("sb-show");
-  if (showBtn) showBtn.title = show ? "Menú visible" : "Mostrar el menú";
-}
 
-function init() {
-  const card = $("sb-collapse");
-  if (card) card.addEventListener("click", toggleMenu);
+  function init() {
+    const btn = document.getElementById("sb-collapse");
+    if (btn) btn.addEventListener("click", toggle);
 
-  const showBtn = $("sb-show");
-  if (showBtn) showBtn.addEventListener("click", () => setMenu(true));
-
-  try {
-    if (localStorage.getItem("apa.menu.hidden") === "1") setMenu(false);
-  } catch (e) {
-    /* sin persistencia */
+    let guardada = "0";
+    try {
+      guardada = localStorage.getItem(KEY) || "0";
+    } catch (e) {
+      /* sin persistencia: se queda desplegado */
+    }
+    setCollapsed(guardada === "1");
   }
-}
 
-export const Sidebar = { init, setMenu };
+  return { init, setCollapsed, toggle };
+})();
+
+export { Sidebar };

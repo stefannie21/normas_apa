@@ -15,7 +15,7 @@ from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
 from backend.app.services import ai_reviewer, report
 from backend.app.services.analyzer import analyze
-from backend.app.services.docx_parser import parse_docx
+from backend.app.services.docx_parser import image_sizes, parse_docx
 from backend.app.services.docx_writer import apply_corrections
 from backend.app.services.report_docx import build_report_docx
 
@@ -316,6 +316,8 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
             "paragraphs": paragraphs,
             "sections": _sections_meta(doc),
             "defaults": _doc_defaults(doc),
+            # tamano declarado de cada figura, en orden de documento
+            "images": image_sizes(data),
         }
     except HTTPException:
         raise

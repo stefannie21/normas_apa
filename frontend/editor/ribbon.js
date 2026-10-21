@@ -100,7 +100,7 @@ const Ribbon = (function () {
             { type: "action", action: "ai-review", icon: "spark", label: "Revisión con IA", big: true },
             { type: "action", action: "ai-revoke", icon: "shield", label: "Quitar consentimiento IA" },
             { type: "action", action: "fix-doc", icon: "fix", label: "Corregir documento", big: true },
-            { type: "action", action: "toggle-pane", icon: "panel", label: "Panel de informe" },
+            { type: "action", action: "toggle-pane", icon: "panel", label: "Ver informe" },
             { type: "action", action: "clear-marks", icon: "paint", label: "Quitar marcas" },
           ],
         },
@@ -114,7 +114,7 @@ const Ribbon = (function () {
         {
           label: "Estilo APA",
           controls: [
-            { type: "action", action: "apa-defaults", icon: "docs", label: "Aplicar formato base" },
+            { type: "action", action: "apa-defaults", icon: "docs", label: "Formato base", hint: "Aplicar formato base" },
           ],
         },
       ],
@@ -132,7 +132,7 @@ const Ribbon = (function () {
         {
           label: "Mostrar",
           controls: [
-            { type: "action", action: "toggle-pane", icon: "panel", label: "Panel de informe" },
+            { type: "action", action: "toggle-pane", icon: "panel", label: "Ver informe" },
             { type: "action", action: "toggle-ruler", icon: "ruler", label: "Regla" },
           ],
         },
@@ -220,6 +220,12 @@ function renderSelect(c) {
     const wrap = el("div", "rselect-wrap");
     const sel = document.createElement("select");
     sel.className = "rselect";
+    // permite que Commands.refresh() sepa que desplegable hay que atualizar
+    // con lo que tenga el texto seleccionado
+    sel.dataset.cmd = c.cmd || c.action || "";
+    // valor con el que se dibuja por defecto: es al que vuelve la cinta cuando
+    // no hay nada seleccionado
+    if (c.default !== undefined) sel.dataset.default = String(c.default);
     if (c.label) sel.title = c.label;
     const opts = c.options || [];
     // las opciones deben existir ANTES de fijar el valor: si no, el navegador
@@ -300,7 +306,7 @@ function renderSelect(c) {
     btn.className = "rbtn";
     if (c.big) btn.classList.add("big");
     if (c.primary) btn.classList.add("primary");
-    btn.title = c.label || "";
+    btn.title = c.hint || c.label || "";
 
     const parts = [];
     if (c.letter) {

@@ -12,6 +12,12 @@ from docx.shared import Length
 from docx.text.paragraph import Paragraph
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+# <wp:extent> guarda el tamaño con el que el autor colocó la imagen.
+WP_NS = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
+# Las copias de reserva de mc:AlternateContent repiten el mismo dibujo: si se
+# leyeran, cada imagen saldría duplicada.
+MC_FALLBACK_NS = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+EMU_PER_CM = 360000.0
 
 # Tamano de pagina por defecto: A4 (21 x 29.7 cm). Se usa solo cuando el .docx
 # no declara w:pgSz. Antes caia en Carta (8.5 x 11 in), que no es el papel
@@ -402,6 +408,42 @@ def _iter_body_paragraphs(doc: DocxDocument):
                 yield from walk(cell, in_table)
 
     yield from walk(body)
+
+
+def image_sizes(data: bytes) -> list[dict]:
+    """Tamano con el que el autor coloco cada imagen, en centimetros.
+
+    Word guarda ese tamano en <wp:extent> (EMU). Mammoth no lo traslada al HTML,
+    asi que sin esto el navegador pinta cada imagen a su tamano natural en
+    pixeles: una figura colocada a 6 cm se ve ocupando toda la caja de texto.
+    Se devuelven en orden de documento, que es el mismo en que mammoth las
+    emite, para poder emparejarlas una a una.
+    """
+    try:
+        doc: DocxDocument = Document(BytesIO(data))
+        body = doc.element.body
+    except Exception:
+        return []
+
+    out: list[dict] = []
+    for extent in body.iter(WP_NS + "extent"):
+        # se ignoran las copias de reserva: describen el mismo dibujo
+        if any(a.tag == MC_FALLBACK_NS for a in extent.iterancestors()):
+            continue
+        try:
+            cx = int(extent.get("cx"))
+            cy = int(extent.get("cy"))
+        except (TypeError, ValueError):
+            continue
+        if cx <= 0 or cy <= 0:
+            continue
+        out.append(
+            {
+                "width_cm": round(cx / EMU_PER_CM, 3),
+                "height_cm": round(cy / EMU_PER_CM, 3),
+            }
+        )
+    return out
 
 
 def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:

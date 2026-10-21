@@ -15,12 +15,31 @@ const Fixer = (function () {
     return document.getElementById("page");
   }
 
-  function allBlocks() {
+  /* ---------- Ambito ----------
+     `ctx.el` acota la correccion al bloque donde se pulso "Corregir esto".
+     Sin el (corrector del panel, o documento entero) el ambito es #page. */
+  function scopeOf(ctx) {
+    return (ctx && ctx.el) || root();
+  }
+
+  // nodos que coinciden con el selector DENTRO del ambito (incluido el mismo)
+  function scopeNodes(ctx, selector) {
+    const base = scopeOf(ctx);
+    const p = root();
+    if (!p || !base) return [];
+    if (base === p) return Array.from(p.querySelectorAll(selector));
+    const out = [];
+    if (base.matches && base.matches(selector)) out.push(base);
+    Array.from(base.querySelectorAll(selector)).forEach((el) => out.push(el));
+    return out;
+  }
+
+  function allBlocks(ctx) {
     const p = root();
     if (!p) return [];
-    return Array.from(
-      p.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li,blockquote")
-    ).filter((el) => !el.classList.contains("sheet-num") && !el.closest(".doc-toc"));
+    return scopeNodes(ctx, "p,h1,h2,h3,h4,h5,h6,li,blockquote").filter(
+      (el) => !el.classList.contains("sheet-num") && !el.closest(".doc-toc")
+    );
   }
 
   function isHeading(el) {
@@ -119,9 +138,9 @@ const Fixer = (function () {
       label: "Interlineado doble",
       detail: "Fija el interlineado en 2.0 en todo el texto.",
       rules: ["FORMAT-004"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (el.style.lineHeight !== "2") {
             writeStyle(el, "lineHeight", "2");
             n++;
@@ -135,9 +154,9 @@ const Fixer = (function () {
       label: "Quitar espacio entre párrafos",
       detail: "Deja 0 pt de espacio antes y después de cada párrafo.",
       rules: ["FORMAT-007"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (el.style.marginTop !== "0" || el.style.marginBottom !== "0") {
             writeStyle(el, "marginTop", "0");
             writeStyle(el, "marginBottom", "0");
@@ -152,9 +171,9 @@ const Fixer = (function () {
       label: "Sangría de primera línea (1.27 cm)",
       detail: "Aplica sangría de 0.5 pulgadas a los párrafos del cuerpo.",
       rules: ["FORMAT-006"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (el.tagName !== "P" || isHeading(el)) return;
           if (isReference(el)) return;
           if ((el.textContent || "").trim().length < 80) return;
@@ -171,9 +190,9 @@ const Fixer = (function () {
       label: "Alinear a la izquierda",
       detail: "Quita la justificación y alinea a la izquierda (regla APA).",
       rules: ["FORMAT-005"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (el.style.textAlign === "justify") {
             writeStyle(el, "textAlign", "left");
             n++;
@@ -187,10 +206,16 @@ const Fixer = (function () {
       label: "Márgenes de 2.54 cm",
       detail: "Ajusta los márgenes de cada hoja a 1 pulgada.",
       rules: ["FORMAT-001"],
+      // los margenes son de la HOJA, no del parrafo: se corrige la hoja que
+      // contiene la marca y el boton avisa de que el alcance es el documento
+      scope: "doc",
       apply(ctx) {
         let n = 0;
         const sections = (ctx && ctx.sections) || [];
-        root().querySelectorAll(".sheet").forEach((sheet, i) => {
+        const base = scopeOf(ctx);
+        const propia = base && base.closest ? base.closest(".sheet") : null;
+        const hojas = propia ? [propia] : Array.from(root().querySelectorAll(".sheet"));
+        hojas.forEach((sheet, i) => {
           const s = sections[Number(sheet.dataset.section || i)] || {};
           const pad = [s.top_in, s.right_in, s.bottom_in, s.left_in].every(
             (v) => v == null || Math.abs(v - 1) < 0.1
@@ -211,9 +236,9 @@ const Fixer = (function () {
       label: "Corregir 'et al.'",
       detail: "Añade el punto final en las citas con 'et al'.",
       rules: ["CIT-003"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        root().querySelectorAll("p,li").forEach((el) => {
+        scopeNodes(ctx, "p,li").forEach((el) => {
           const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
           const nodes = [];
           while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -233,9 +258,9 @@ const Fixer = (function () {
       label: "Usar '&' dentro de las citas",
       detail: "Sustituye 'and' o 'y' por '&' dentro de los paréntesis de cita.",
       rules: ["CIT-002"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        root().querySelectorAll("p,li").forEach((el) => {
+        scopeNodes(ctx, "p,li").forEach((el) => {
           const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
           const nodes = [];
           while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -258,9 +283,9 @@ const Fixer = (function () {
       label: "Sangría francesa en las referencias",
       detail: "Aplica la sangría francesa de 1.27 cm a cada referencia.",
       rules: ["REF-002"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (!isReference(el) || isHeading(el)) return;
           if (el.style.textIndent === "-0.5in" && el.style.marginLeft === "0.5in") return;
           writeStyle(el, "marginLeft", "0.5in");
@@ -275,7 +300,9 @@ const Fixer = (function () {
       label: "Ordenar las referencias alfabéticamente",
       detail: "Reordena la lista de referencias por el primer apellido.",
       rules: ["REF-003"],
-apply() {
+      // reordenar la lista entera no tiene sentido "por parrafo"
+      scope: "doc",
+      apply() {
         const p = root();
         if (!p) return 0;
         let titleEl = null;
@@ -308,9 +335,9 @@ apply() {
       label: "Cursivas en las referencias",
       detail: "Cursiva el título (libros/tesis) o el contenedor (artículos).",
       rules: ["REF-006"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        allBlocks().forEach((el) => {
+        allBlocks(ctx).forEach((el) => {
           if (!isReference(el) || isHeading(el)) return;
           if (el.querySelector("em, i")) return; // ya tiene cursiva
           const text = el.textContent || "";
@@ -330,9 +357,9 @@ apply() {
       label: "Formato de los títulos por nivel",
       detail: "Nivel 1 centrado y negrita; niveles 2 y 3 a la izquierda y en negrita (nivel 3 en cursiva).",
       rules: ["HEAD-002"],
-      apply() {
+      apply(ctx) {
         let n = 0;
-        root().querySelectorAll("h1,h2,h3").forEach((el) => {
+        scopeNodes(ctx, "h1,h2,h3").forEach((el) => {
           const level = Number(el.tagName[1]);
           writeStyle(el, "fontWeight", "700");
           if (level === 1) writeStyle(el, "textAlign", "center");

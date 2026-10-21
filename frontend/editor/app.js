@@ -6,6 +6,8 @@ import { Fixer } from "./fixer.js";
 import { History } from "./history.js";
 import { SessionStore } from "./storage.js";
 import { Ribbon } from "./ribbon.js";
+import { Router } from "../core/router.js";
+import { Library } from "../library.js";
 
 const App = (function () {
   "use strict";
@@ -18,13 +20,6 @@ const App = (function () {
   const analyzeBtn = document.getElementById("analyze-btn");
   const openBtn = document.getElementById("open-btn");
   const emptyOpen = document.getElementById("empty-open");
-  const reportPane = document.getElementById("report-pane");
-  const paneClose = document.getElementById("pane-close");
-  const scoreNum = document.getElementById("score-num");
-  const paneCards = document.getElementById("pane-cards");
-  const downloadReportBtn = document.getElementById("download-report");
-  const paneFilters = document.getElementById("pane-filters");
-  const findingsEl = document.getElementById("findings");
   const statusMsg = document.getElementById("status-msg");
   const statusWords = document.getElementById("status-words");
   const statusChars = document.getElementById("status-chars");
@@ -35,7 +30,6 @@ const App = (function () {
   let currentFile = null;
   let currentFindings = [];
   let allFindings = []; // copia integra del informe, sin filtrar
-  let activeFilter = "all";
   let zoom = 100;
   let reading = false;
   let docSections = null; // geometria de cada seccion del docx (vertical/horizontal)
@@ -46,7 +40,7 @@ const App = (function () {
     "ai-review": runAiReview,
     "ai-revoke": revokeAiConsent,
     "fix-doc": openFixModal,
-    "toggle-pane": () => (reportPane.hidden ? openPane() : (reportPane.hidden = true)),
+    "toggle-pane": () => Router.go("reportes"),
     "clear-marks": clearMarks,
     "page-break": () => {
       insertHtml('<div class="page-break"></div>');
@@ -185,6 +179,18 @@ const App = (function () {
           el.parentNode.insertBefore(br, el);
         }
       });
+
+      // Tamaño con el que el autor colocó cada figura en Word. Mammoth no lo
+      // traslada al HTML, así que sin esto el paginador las pinta a su tamaño
+      // natural en píxeles y una figura de 6 cm se ve ocupando la caja entera.
+      // El orden del backend es el mismo en que mammoth emite los <img>.
+      const imgs = Array.from(tmp.querySelectorAll("img"));
+      (meta.images || []).forEach((s, i) => {
+        if (!imgs[i] || !s) return;
+        imgs[i].setAttribute("data-docx-w", s.width_cm);
+        imgs[i].setAttribute("data-docx-h", s.height_cm);
+      });
+
       const out = tmp.innerHTML;
       document.body.removeChild(tmp);
       return out;
@@ -226,6 +232,9 @@ const App = (function () {
     docName.textContent = file.name;
     analyzeBtn.disabled = false;
     saveBtn.disabled = false;
+    Library.record(file).catch(() => {
+      // la biblioteca es una comodidad: si falla, el editor sigue igual
+    });
     markDirty(false);
     
 
@@ -408,7 +417,7 @@ const App = (function () {
       aiFindings = payload.findings || [];
       if (!lastFindings.length) runAnalysisQuiet();
       renderReport({ summary: lastSummary, findings: lastFindings.concat(aiFindings) });
-      openPane();
+      openReportes();
       (payload.notes || []).forEach((n) => showToast(n, "info"));
       statusMsg.textContent = "";
       showToast(
@@ -562,10 +571,13 @@ const App = (function () {
       }
       const report = await res.json();
       renderReport(report);
-      openPane();
+      Library.syncAnalysis(report.summary, currentFile && currentFile.name).catch(() => {
+        /* sin biblioteca no se rompe nada */
+      });
       statusMsg.textContent = "";
       const total = (report.summary && report.summary.total_findings) || (report.findings || []).length;
-      showToast("Informe generado: " + total + " hallazgos.", "ok");
+      // el informe ya no aparece junto al documento: se avisa donde esta
+      showToast("Informe generado: " + total + " hallazgos. Está en la sección Reportes.", "ok");
     } catch (err) {
       statusMsg.textContent = "";
       showToast("No se pudo analizar: " + err.message, "error");
@@ -574,11 +586,16 @@ const App = (function () {
     }
   }
 
-
-  function openPane() {
-    reportPane.hidden = false;
+  /* El informe ya no se dibuja en un panel pegado al documento: la vista
+     "Reportes" lo pinta a partir de este estado. */
+  function openReportes() {
+    Router.go("reportes");
   }
-  paneClose.addEventListener("click", () => (reportPane.hidden = true));
+
+  // Indices (sobre allFindings) de los avisos YA CORREGIDOS. Se guarda el
+  // aviso concreto y no la regla entera: corregir un parrafo no puede tapar
+  // los demas avisos de esa misma regla, que siguen siendo reales.
+  const resolvedIdx = new Set();
 
   function resetReport() {
     currentFindings = [];
@@ -586,39 +603,30 @@ const App = (function () {
     allFindings = [];
     lastSummary = null;
     aiFindings = [];
-    activeFilter = "all";
-    scoreNum.textContent = "--";
-    paneCards.innerHTML = "";
-    paneFilters.innerHTML = "";
-    if (downloadReportBtn) downloadReportBtn.disabled = true;
-    findingsEl.innerHTML = '<p class="empty-pane">Aún no se ha verificado el documento.</p>';
+    resolvedIdx.clear();
+    notifyChange();
+  }
+
+  // De la copia integra se descuenta lo ya corregido, aviso a aviso.
+  function refreshCurrentFindings() {
+    currentFindings = [];
+    allFindings.forEach((f, i) => {
+      if (!resolvedIdx.has(i)) currentFindings.push(f);
+    });
   }
 
   function renderReport(report) {
     const s = report.summary || {};
-    const by = s.by_severity || {};
     lastSummary = s;
-    // copia integra: no se filtra, para poder deshacer y volver a marcar todo
-    if (!report.partial) allFindings = report.findings || [];
-    lastFindings = report.findings || [];
-    scoreNum.textContent = s.compliance_score != null ? s.compliance_score : "--";
-    if (downloadReportBtn) downloadReportBtn.disabled = !currentFile;
-
-    currentFindings = report.findings || [];
-    const counts = countBy(currentFindings);
-    paneCards.innerHTML = [
-      card(counts.error, "Errores", "error"),
-      card(counts.warning, "Avisos", "warning"),
-      card(counts.info, "Observ.", "info"),
-      card(counts.all, "Total"),
-    ].join("");
-
-    activeFilter = "all";
-    renderFilters();
-    renderFindings();
+    if (!report.partial) {
+      // informe nuevo: esta es la copia integra y se reinicia lo ya corregido
+      allFindings = report.findings || [];
+      resolvedIdx.clear();
+      lastFindings = allFindings;
+    }
+    refreshCurrentFindings();
     markInDocument();
-    // el panel de Inicio muestra estos mismos numeros: se le avisa para que no
-    // se quede con los valores anteriores
+    // la vista Reportes y el panel de Inicio se repintan con estos numeros
     notifyChange();
   }
 
@@ -654,66 +662,15 @@ const App = (function () {
     return c;
   }
 
-  function card(value, label, cls) {
-    return `<div class="pane-card ${cls || ""}"><div class="pc-num">${value}</div><div class="pc-label">${label}</div></div>`;
-  }
-
-  function renderFilters() {
-    const counts = { all: currentFindings.length, error: 0, warning: 0, info: 0 };
-    currentFindings.forEach((f) => (counts[f.severity] = (counts[f.severity] || 0) + 1));
-    const items = [["all", "Todos"], ["error", "Errores"], ["warning", "Avisos"], ["info", "Observ."]];
-    paneFilters.innerHTML = items
-      .map(
-        ([k, label]) =>
-          `<button data-filter="${k}" class="${activeFilter === k ? "active" : ""}">${label} <b>${counts[k] || 0}</b></button>`
-      )
-      .join("");
-    paneFilters.querySelectorAll("button").forEach((b) =>
-      b.addEventListener("click", () => {
-        activeFilter = b.dataset.filter;
-        renderFilters();
-        renderFindings();
-      })
-    );
-  }
-
-  function renderFindings() {
-    const list = currentFindings.filter((f) => activeFilter === "all" || f.severity === activeFilter);
-    if (!list.length) {
-      findingsEl.innerHTML = '<p class="empty-pane">Sin hallazgos en esta categoria.</p>';
-      return;
-    }
-    findingsEl.innerHTML = list
-      .map((f) => {
-        const extra = f.extra || {};
-        const isAi = String(f.rule_id || "").startsWith("AI-");
-        const model = extra.ai_model ? ` · Modelo: ${escapeHtml(extra.ai_model)}` : "";
-        const confTxt = extra.ai_confidence != null ? ` · Confianza: ${Math.round(extra.ai_confidence * 100)}%` : "";
-        const badge = isAi
-          ? `<span class="ai-badge" title="Sugerencia de la IA: no se aplica automáticamente. Solo revisa citas/referencias.${model}${confTxt}">IA</span>`
-          : "";
-        const missing =
-          isAi && extra.ai_missing && extra.ai_missing.length
-            ? `<p class="finding-missing">Falta: ${escapeHtml(extra.ai_missing.join(" · "))}</p>`
-            : "";
-        return `<article class="finding ${f.severity}${isAi ? " ai" : ""}" data-i="${currentFindings.indexOf(f)}">
-          <div class="finding-head">
-            <span class="dot">${SEVERITY_ICON[f.severity] || ""}</span>
-            <span class="finding-cat">${escapeHtml(f.category || "")}</span>
-            ${badge}${conf}
-            <span class="finding-rule">${escapeHtml(f.rule_id || "")}</span>
-          </div>
-          <p class="finding-msg">${escapeHtml(f.message || "")}</p>
-          ${missing}
-          ${f.excerpt ? `<p class="finding-excerpt">"${escapeHtml(f.excerpt)}"</p>` : ""}
-          ${f.suggestion ? `<p class="finding-sug">Sugerencia: ${escapeHtml(f.suggestion)}</p>` : ""}
-          <p class="finding-loc">${escapeHtml(f.location || "")}</p>
-        </article>`;
-      })
-      .join("");
-    findingsEl.querySelectorAll(".finding").forEach((el) =>
-      el.addEventListener("click", () => jumpToFinding(currentFindings[Number(el.dataset.i)]))
-    );
+  /* Estado del informe para la vista "Reportes" y el panel de Inicio. */
+  function reportState() {
+    return {
+      ready: lastSummary != null || allFindings.length > 0,
+      summary: lastSummary,
+      findings: currentFindings.slice(),
+      counts: countBy(currentFindings),
+      hasFile: !!currentFile,
+    };
   }
 
   function normKey(t) {
@@ -950,6 +907,9 @@ const App = (function () {
 
   function jumpToFinding(f) {
     if (!f) return;
+    // desde "Reportes" el documento esta oculto: hay que volver antes de
+    // desplazarse, o el salto no se ve
+    if (Router.current() !== "correcciones") Router.go("correcciones");
     clearFocusHighlight();
     let target = null;
     if (f.excerpt && f.excerpt.length > 8) {
@@ -1098,8 +1058,30 @@ const App = (function () {
     pickFile() {
       fileInput.click();
     },
+    // Reabrir una tesis guardada en la biblioteca.
+    openFile(file) {
+      if (file) loadFile(file);
+    },
     openReport() {
-      if (reportPane.hidden) openPane();
+      openReportes();
+    },
+    toast(message, kind) {
+      showToast(message, kind);
+    },
+    report() {
+      return reportState();
+    },
+    downloadReport() {
+      return downloadReportDocx();
+    },
+    jumpToFinding(f) {
+      jumpToFinding(f);
+    },
+    openFixModal() {
+      openFixModal();
+    },
+    runAiReview() {
+      return runAiReview();
     },
   };
 
@@ -1153,12 +1135,11 @@ const App = (function () {
 
   // Recolecta los IDs de las reglas que se han corregido
   function getCorrectedRuleIds() {
-    var ids = [];
-    for (var i = 0; i < resolvedRules.size; i++) {
-      // resolvedRules es un Set; se itera manualmente
-    }
-    resolvedRules.forEach(function (r) { ids.push(r); });
-    return ids;
+    var ids = new Set();
+    allFindings.forEach(function (f, i) {
+      if (resolvedIdx.has(i) && f.rule_id) ids.add(f.rule_id);
+    });
+    return Array.from(ids);
   }
 
   async function downloadCorrectedDocx() {
@@ -1218,7 +1199,6 @@ const App = (function () {
       showToast("Abre un documento primero", "error");
       return;
     }
-    if (downloadReportBtn) downloadReportBtn.disabled = true;
     statusMsg.textContent = "Generando informe APA en Word...";
     var formData = new FormData();
     formData.append("file", currentFile, currentFile.name);
@@ -1251,8 +1231,6 @@ const App = (function () {
     } catch (err) {
       statusMsg.textContent = "";
       showToast("No se pudo generar el informe: " + err.message, "error");
-    } finally {
-      if (downloadReportBtn) downloadReportBtn.disabled = false;
     }
   }
 
@@ -1305,9 +1283,6 @@ const App = (function () {
   }
 
   saveBtn.addEventListener("click", downloadCorrectedDocx);
-  if (downloadReportBtn) {
-    downloadReportBtn.addEventListener("click", downloadReportDocx);
-  }
 
   /* ---------- Plegar la cinta de opciones ---------- */
   const ribbonNav = document.getElementById("ribbon");
@@ -1417,20 +1392,49 @@ const App = (function () {
     markDirty(true);
     fixModal.hidden = true;
     showToast("Se aplicaron " + res.total + " corrección(es) correctamente.", "ok");
-    // tras corregir, se retiran las marcas de las reglas ya resueltas:
-    // lo que queda marcado es justo lo que hay que revisar a mano
+    // el corrector del panel SI actsua sobre todo el documento: aqui se
+    // resuelven todos los avisos de las reglas aplicadas
+    const aplicadas = reglasAplicadas(res);
+    if (aplicadas.size) {
+      allFindings.forEach((f, i) => {
+        if (aplicadas.has(f.rule_id)) resolvedIdx.add(i);
+      });
+    }
     refreshMarksAfterFix(res);
   }
 
-  const resolvedRules = new Set();
-
-  function refreshMarksAfterFix(res) {
-    (res && res.done ? res.done : []).forEach((d) => {
-      (d.rules || []).forEach((r) => resolvedRules.add(r));
+  function reglasAplicadas(res) {
+    const out = new Set();
+    ((res && res.done) || []).forEach((d) => {
+      (d.rules || []).forEach((r) => out.add(r));
     });
-    currentFindings = allFindings.filter((f) => !resolvedRules.has(f.rule_id));
-    const quedan = currentFindings.length;
-    renderReport({ summary: lastSummary, findings: currentFindings, partial: true });
+    return out;
+  }
+
+  // `markFindings` son los avisos de la marca pulsada. Si no se pasan (o van
+  // vacios) se resuelven todos los avisos de las reglas aplicadas.
+  function refreshMarksAfterFix(res, markFindings) {
+    if (!res || !res.total) {
+      renderReport({ summary: lastSummary, partial: true });
+      return;
+    }
+    const aplicadas = reglasAplicadas(res);
+    if (aplicadas.size) {
+      if (markFindings && markFindings.length) {
+        // solo se retiran los avisos de ESA marca: el resto sigue disponible
+        markFindings.forEach((f) => {
+          if (!aplicadas.has(f.rule_id)) return;
+          const i = allFindings.indexOf(f);
+          if (i !== -1) resolvedIdx.add(i);
+        });
+      } else {
+        allFindings.forEach((f, i) => {
+          if (aplicadas.has(f.rule_id)) resolvedIdx.add(i);
+        });
+      }
+    }
+    const quedan = allFindings.length - resolvedIdx.size;
+    renderReport({ summary: lastSummary, partial: true });
     if (quedan) {
       setTimeout(function () {
         showToast("Quedan " + quedan + " aviso(s) por revisar manualmente.", "info");
@@ -1446,10 +1450,9 @@ const App = (function () {
     fixUndo.hidden = true;
     closeFixModal();
     showToast("Correcciones deshechas", "ok");
-    // al deshacer vuelven a aparecer los avisos de las reglas corregidas
-    resolvedRules.clear();
-    currentFindings = allFindings;
-    renderReport({ summary: lastSummary, findings: currentFindings, partial: true });
+    // al deshacer vuelven a aparecer los avisos corregidos
+    resolvedIdx.clear();
+    renderReport({ summary: lastSummary, partial: true });
   }
 
   fixApply.addEventListener("click", applyFixes);
@@ -1466,20 +1469,18 @@ const App = (function () {
   // el marcado del documento usa estos enlaces con la app
   Marker.setHooks({
     sections: () => docSections || [],
-    afterFix: (res) => {
+    afterFix: (res, markFindings) => {
       repaginate();
       markDirty(true);
       showToast(
         res && res.total
           ? "Corregido (" + res.total + ")"
-          : "No había nada que corregir",
+          : "Aquí ya estaba correcto",
         res && res.total ? "ok" : "info"
       );
-      refreshMarksAfterFix(res);
+      refreshMarksAfterFix(res, markFindings);
     },
-    openReport: () => {
-      if (reportPane.hidden) openPane();
-    },
+    openReport: () => openReportes(),
   });
 
   /* ---------- Init ---------- */

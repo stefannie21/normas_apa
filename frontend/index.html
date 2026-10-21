@@ -10,34 +10,26 @@
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="sb-brand">
-        <span class="sb-logo" data-icon="cap"></span>
-        <span class="sb-brand-text">
-          <strong>TesisPro</strong>
-          <small>Sistema de correcci&oacute;n de tesis</small>
+        <span class="sb-mark">A</span>
+        <span class="sb-brand-txt">
+          <strong>APA<em>Studio</em></strong>
+          <small>Tu tesis, en marcha</small>
         </span>
       </div>
 
-      <nav class="sb-nav" id="sb-nav"></nav>
+      <nav class="sb-nav" id="sb-nav" aria-label="Secciones"></nav>
 
-      <button class="sb-card" id="sb-collapse" title="Ocultar el men&uacute;">
-        <span class="sb-card-icn" data-icon="chevron"></span>
-        <span class="sb-card-text">
-          <strong>Ocultar men&uacute;</strong>
-          <small>Amplia el &aacute;rea de edici&oacute;n</small>
-        </span>
+      <button class="sb-collapse" id="sb-collapse" title="Plegar el menú" aria-label="Plegar el menú" aria-expanded="true">
+        <svg class="burger" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round"/>
+        </svg>
       </button>
     </aside>
 
     <div class="sb-main">
     <header class="titlebar">
       <div class="titlebar-left">
-        <button class="sb-show" id="sb-show" title="Mostrar el menú" aria-label="Mostrar el menú">
-          <span data-icon="menu"></span>
-        </button>
-        <div class="brand">
-          <span class="brand-mark">A</span>
-          <span class="brand-name">APA&nbsp;Studio</span>
-        </div>
         <div class="doc-title">
           <span id="doc-name">Documento sin título</span>
           <span class="doc-badge" id="doc-badge" hidden>APA</span>
@@ -89,28 +81,6 @@
           </div>
         </div>
       </section>
-
-      <aside class="report-pane" id="report-pane" hidden>
-        <div class="pane-head">
-          <span data-icon="clipboard"></span>
-          <h2>Informe APA</h2>
-          <button class="pane-close" id="pane-close" title="Cerrar">&times;</button>
-        </div>
-        <div class="pane-body">
-          <div class="score">
-            <div class="score-ring"><span id="score-num">--</span><small>%</small></div>
-            <div class="score-label">Nivel de cumplimiento</div>
-          </div>
-          <div class="pane-actions">
-            <button class="pane-download" id="download-report" disabled title="Descargar el informe APA en un documento Word (.docx)">
-              <span data-icon="save"></span> Descargar informe en Word
-            </button>
-          </div>
-          <div class="pane-cards" id="pane-cards"></div>
-          <div class="pane-filters" id="pane-filters"></div>
-          <div class="findings" id="findings"></div>
-        </div>
-      </aside>
     </main>
 
     <section class="view" id="view" hidden>

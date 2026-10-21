@@ -139,6 +139,79 @@ function contentBlocks() {
     applyToBlocks("fontSize", value + "pt");
   }
 
+  /* ---------- Estado de la cinta ----------
+     Como en Word, los controles reflejan el texto que hay seleccionado:
+     la fuente, el tamano, el interlineado y el estilo. Si la seleccion es
+     heterogenea se deja el desplegable en blanco (selectedIndex = -1), que es
+     como lo hace Word, en vez de mentir con el valor de un solo parrafo. */
+
+  const FONT_ALIAS = {
+    "times new roman": "Times New Roman",
+    calibri: "Calibri",
+    arial: "Arial",
+    georgia: "Georgia",
+    "lucida sans unicode": "Lucida Sans Unicode",
+    "computer modern": "Computer Modern",
+  };
+
+  // Primer nombre de fuente real de un valor de font-family ("A", serif).
+  function firstFamily(value) {
+    const first = String(value || "").split(",")[0].trim().replace(/^["']|["']$/g, "");
+    return FONT_ALIAS[first.toLowerCase()] || first;
+  }
+
+  // Normaliza a puntos. El estilo en linea viene en "12pt" y el computado en
+  // pixeles ("16px"), y 12 != 16: hay que distinguir las unidades o el tamano
+  // sale cambiado.
+  function toPt(value) {
+    const s = String(value || "").trim();
+    const n = parseFloat(s);
+    if (isNaN(n)) return null;
+    if (/pt$/i.test(s)) return n;
+    return (n / 96) * 72;
+  }
+
+  // Valor comun a todos los bloques, o null si difieren.
+  function commonValue(blocks, read) {
+    let first = null;
+    for (const b of blocks) {
+      const v = read(b);
+      if (v == null) continue;
+      if (first == null) first = v;
+      else if (first !== v) return null;
+    }
+    return first;
+  }
+
+  // Fija un desplegable al valor del texto seleccionado. Si ese valor no esta
+  // entre las opciones se agrega temporalmente y se muestra, que es lo que hace
+  // Word: asi se ve que el texto usa "Courier New" en vez de una fuente APA, en
+  // lugar de dejar el desplegable vacio sin explicación.
+  function setSelect(sel, value) {
+    if (!sel) return;
+    // se limpian las opciones temporales de la pasada anterior
+    Array.prototype.slice
+      .call(sel.querySelectorAll("option[data-temp]"))
+      .forEach((o) => o.remove());
+    if (value == null) {
+      sel.selectedIndex = -1;
+      return;
+    }
+    const target = String(value);
+    let i = Array.prototype.findIndex.call(sel.options, (o) => o.value === target);
+    if (i === -1) {
+      const o = document.createElement("option");
+      o.value = target;
+      o.textContent = target;
+      o.dataset.temp = "1";
+      sel.appendChild(o);
+      i = sel.options.length - 1;
+    }
+    sel.selectedIndex = i;
+  }
+
+  const STYLE_BY_TAG = { P: "Normal", LI: "Párrafo de lista", H1: "Título 1", H2: "Título 2", H3: "Título 3" };
+
   function refresh() {
     document.querySelectorAll("[data-toggle='1']").forEach((btn) => {
       let state = false;
@@ -149,6 +222,46 @@ function contentBlocks() {
       }
       btn.classList.toggle("on", state);
     });
+
+    const blocks = selectedBlocks();
+    if (!blocks.length) {
+      // sin seleccion se vuelve al valor con el que se dibuja la cinta, no al
+      // primero de la lista (que en el tamano seria 8, no el 12 por defecto)
+      ["fontName", "fontSize", "lineHeight", "style"].forEach((cmd) => {
+        const sel = document.querySelector('.rselect[data-cmd="' + cmd + '"]');
+        if (!sel) return;
+        if (sel.dataset.touched === "1") return;
+        setSelect(sel, sel.dataset.default != null ? sel.dataset.default : sel.options[0] && sel.options[0].value);
+      });
+      return;
+    }
+
+    const fuente = commonValue(blocks, (b) =>
+      firstFamily(b.style.fontFamily || getComputedStyle(b).fontFamily)
+    );
+    setSelect(document.querySelector('.rselect[data-cmd="fontName"]'), fuente);
+
+    const tamano = commonValue(blocks, (b) => {
+      const pt = toPt(b.style.fontSize || getComputedStyle(b).fontSize);
+      // 13.02 pt se muestra como 13: el desplegable no admite decimales y una
+      // cifra larguisima no ayuda a leerlo
+      return pt == null ? null : Math.round(pt);
+    });
+    // si el tamano no esta en la lista (p. ej. 14 pt) se deja en blanco
+    setSelect(document.querySelector('.rselect[data-cmd="fontSize"]'), tamano);
+
+    const interlineado = commonValue(blocks, (b) => {
+      const cs = getComputedStyle(b);
+      const lh = parseFloat(cs.lineHeight);
+      const fs = parseFloat(cs.fontSize);
+      if (isNaN(lh) || isNaN(fs) || !fs) return cs.lineHeight === "normal" ? "1" : null;
+      const ratio = Math.round((lh / fs) * 100) / 100;
+      return Math.abs(ratio - Math.round(ratio)) < 0.05 ? String(Math.round(ratio)) : ratio;
+    });
+    setSelect(document.querySelector('.rselect[data-cmd="lineHeight"]'), interlineado);
+
+    const estilo = commonValue(blocks, (b) => STYLE_BY_TAG[b.tagName] || null);
+    setSelect(document.querySelector('.rselect[data-cmd="style"]'), estilo);
   }
 
     return {
