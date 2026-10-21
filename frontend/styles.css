@@ -449,19 +449,32 @@ body {
   grid-template-rows: 1fr;
   transition: grid-template-rows .22s ease;
 }
-.ribbon-body > .ribbon-panels { min-height: 0; overflow: hidden; }
+/* overflow-x: auto (y no hidden) es la red de seguridad: si en una ventana muy
+   estrecha la cinta no cupiese ni con los escalones de arriba, se puede
+   desplazar en horizontal en vez de recortar el ultimo grupo en silencio. */
+.ribbon-body > .ribbon-panels { min-height: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.ribbon-body > .ribbon-panels::-webkit-scrollbar { height: 6px; }
+.ribbon-body > .ribbon-panels::-webkit-scrollbar-thumb { background: #cfd8e3; border-radius: 3px; }
 .ribbon.is-collapsed .ribbon-body { grid-template-rows: 0fr; }
 
+/* Cada grupo crece con el espacio libre, de modo que la cinta se reparte por
+   TODO el ancho de la barra en vez de amontonarse a la izquierda. min-width:
+   max-content impide que un grupo se encoja por debajo de su contenido, que
+   era justo lo que hacia que las etiquetas se montaran unas sobre otras. */
 .ribbon-group {
   display: flex; flex-direction: column; justify-content: space-between;
+  flex: 1 1 auto; min-width: max-content;
   padding: 0 10px; border-right: 1px solid var(--line);
 }
 .ribbon-group:last-child { border-right: none; }
-.ribbon-group-controls { display: flex; flex-wrap: nowrap; gap: 2px; align-items: flex-start; }
+/* Centrados dentro del grupo: como cada grupo se reparte el ancho, el bloque
+   queda equilibrado y con aire entre botones. */
+.ribbon-group-controls { display: flex; flex-wrap: nowrap; gap: 4px; align-items: flex-start; justify-content: center; }
 .ribbon-group-label { text-align: center; font-size: .68rem; color: var(--muted); padding-top: 4px; }
 
 .rbtn {
   display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  flex: 0 0 auto;
   background: transparent; border: 1px solid transparent; border-radius: 6px;
   padding: 5px 6px; min-width: 32px; color: var(--ink); cursor: pointer; font-size: .68rem;
 }
@@ -1240,41 +1253,50 @@ body.reading #page { cursor: default; }
 
 /* ============================================================
    Cinta adaptable
-   La cinta va en UNA fila siempre. Estos escalones solo recortan aire y
-   ancho de boton a medida que la ventana se estrecha.
+   La cinta va en UNA fila siempre y los grupos se reparten TODO el ancho de
+   la barra (ver .ribbon-group). Estos escalones solo recortan aire y, cuando
+   las etiquetas de los botones pequenos ya no caben sin montarse unas sobre
+   otras, las ocultan dejando el icono (el nombre sigue en el title). Nunca se
+   fuerza un ancho menor que el texto: eso era justo lo que hacia que las
+   etiquetas se solaparan.
    El orden importa (de mas ancho a mas estrecho).
    ============================================================ */
-@media (max-width: 1440px) {
+/* Con las etiquetas, la pestana Inicio pide unos 1368 px de cinta (ventanas de
+   mas de ~1600 px). Por debajo, las etiquetas de los botones pequenos ya no
+   caben sin montarse unas sobre otras: se quedan solo con el icono. */
+@media (max-width: 1600px) {
+  .ribbon-panel { padding: 6px 8px 4px; }
+  .ribbon-group { padding: 0 8px; }
+  .ribbon-group-controls { gap: 2px; }
+  .ribbon-group-label { font-size: .64rem; }
+  .rselect { max-width: 104px; font-size: .74rem; }
+  .rbtn.big { min-width: 62px; max-width: 70px; font-size: .68rem; }
+  .rcolor-icn { width: 26px; }
+  .rbtn:not(.big) > span:not(.icn):not(.ltr) { display: none; }
+}
+@media (max-width: 1110px) {
   .ribbon-panel { padding: 5px 6px 3px; }
   .ribbon-group { padding: 0 5px; }
   .ribbon-group-controls { gap: 1px; }
-  .ribbon-group-label { font-size: .62rem; }
+  .rselect { max-width: 88px; }
+  .rbtn.big { min-width: 56px; max-width: 62px; }
+  .rcolor-icn { width: 24px; }
 }
-@media (max-width: 1400px) {
-  .ribbon-group { padding: 0 3px; }
+@media (max-width: 1050px) {
+  .ribbon-panel { padding: 4px 5px 2px; }
+  .ribbon-group { padding: 0 4px; }
   .ribbon-group-controls { gap: 0; }
-  .rselect { max-width: 104px; }
-  .rcolor-icn { width: 25px; }
-  .rbtn:not(.big):not(.letter) { width: 46px; padding: 5px 2px; }
+  .rselect { max-width: 74px; font-size: .7rem; }
+  .rbtn { min-width: 28px; padding: 5px 4px; }
+  .rbtn.big { min-width: 50px; max-width: 56px; }
+  .rcolor-icn { width: 22px; }
 }
-@media (max-width: 1240px) {
-  .rselect { max-width: 92px; }
-  .rcolor-icn { width: 23px; }
-  .rbtn:not(.big):not(.letter) { width: 42px; }
-  .rbtn.big { min-width: 64px; max-width: 70px; }
-}
-@media (max-width: 1080px) {
-  .rselect { max-width: 78px; font-size: .72rem; }
-  .rbtn:not(.big):not(.letter) { width: 38px; }
-  .rbtn.big { min-width: 58px; max-width: 62px; font-size: .66rem; }
-  .ribbon-group-label { display: none; }
-}
-@media (max-width: 940px) {
+@media (max-width: 950px) {
   .ribbon-panel { padding: 4px 4px 2px; }
-  .ribbon-group { padding: 0 2px; }
-  .rselect { max-width: 64px; }
-  .rbtn { font-size: .62rem; }
-  .rbtn:not(.big):not(.letter) { width: 34px; }
-  .rbtn.big { min-width: 50px; max-width: 54px; }
-  .rbtn.big > span:not(.icn) { -webkit-line-clamp: 3; }
+  .ribbon-group { padding: 0 3px; }
+  .rselect { max-width: 56px; font-size: .66rem; }
+  .rbtn { min-width: 26px; padding: 5px 4px; }
+  .rbtn.big { min-width: 40px; max-width: 46px; font-size: .62rem; }
+  .rcolor-icn { width: 18px; }
+  .ribbon-group-label { display: none; }
 }
