@@ -1109,6 +1109,22 @@ const App = (function () {
       : "Descargar documento corregido (.docx)";
   }
 
+  // Geometria de las secciones (que hojas son horizontales). Mammoth no la
+  // trae, asi que se pregunta al backend leyendo el .docx original.
+  async function fetchSections(file) {
+    if (!file) return null;
+    try {
+      const data = new FormData();
+      data.append("file", file, file.name);
+      const res = await fetch("/api/docx-meta", { method: "POST", body: data });
+      if (!res.ok) return null;
+      const meta = await res.json();
+      return meta.sections && meta.sections.length ? meta.sections : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function saveSession(silent) {
     if (!currentFile) return;
     // Guardar tambien en IndexedDB por si se recarga la pagina
@@ -1122,6 +1138,9 @@ const App = (function () {
       name: currentFile.name,
       flow: Pager.toFlowHtml(page, ".doc-toc"),
       bytes: buffer,
+      // geometria de las secciones: sin esto, al recargar la pagina se
+      // perdia que hojas son horizontales y todas se pintaban verticales
+      sections: docSections,
       savedAt: new Date().toISOString(),
     };
     try {
@@ -1260,6 +1279,15 @@ const App = (function () {
       // TODOS antes de reconstruirlo, o el indice se veria repetido.
       page.querySelectorAll(".doc-toc").forEach((t) => t.remove());
       buildIndex();
+      // La geometria de las secciones no viaja dentro del flujo HTML: si no se
+      // recupera, el paginador usa la hoja vertical por defecto y las paginas
+      // horizontales del .docx salen comprimidas. Primero se usa la que venia
+      // guardada y, si no hay (sesiones viejas), se vuelve a pedir al backend
+      // con el .docx original.
+      docSections = doc.sections || null;
+      if (!docSections && currentFile) {
+        docSections = await fetchSections(currentFile);
+      }
       Pager.paginate(page, docSections);
       updateTocPages();
       page.contentEditable = "true";
@@ -1475,7 +1503,7 @@ const App = (function () {
       showToast(
         res && res.total
           ? "Corregido (" + res.total + ")"
-          : "Aquí ya estaba correcto",
+          : "No se aplicó ningún cambio aquí",
         res && res.total ? "ok" : "info"
       );
       refreshMarksAfterFix(res, markFindings);

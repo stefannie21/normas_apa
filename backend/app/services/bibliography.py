@@ -306,7 +306,15 @@ def parse_reference(paragraph: ParagraphInfo) -> ReferenceRecord:
     italic_texts = [r.text.strip() for r in paragraph.runs if r.italic and r.text.strip()]
     has_italics = bool(italic_texts)
 
-    m = re.match(r"^(?P<authors>.+?)\s*\((?P<date>[^)]*)\)\.?\s*(?P<rest>.*)$", text, re.S)
+    # El corte correcto es el parentesis DEL ANIO: el autor corporativo puede
+    # llevar la sigla antes, p. ej. 'Universidad Cesar Vallejo (UCV). (2024).
+    # Titulo. Fuente.' Cortar en el primero hacia '(UCV)' y el titulo acababa
+    # siendo '(2024)', que es lo que despues se ponía en cursiva.
+    date_pat = r"(?P<date>[^)]*(?:1[89]\d{2}|20\d{2}|s/?f)[^)]*)"
+    m = re.match(rf"^(?P<authors>.+?)\s*\({date_pat}\)\.?\s*(?P<rest>.*)$", text, re.S)
+    if not m:
+        # sin anio reconocible se corta como antes, para no perder la referencia
+        m = re.match(r"^(?P<authors>.+?)\s*\((?P<date>[^)]*)\)\.?\s*(?P<rest>.*)$", text, re.S)
     if not m:
         return ReferenceRecord(
             paragraph_index=paragraph.index,
@@ -476,14 +484,16 @@ def build_bibliography(document: ParsedDocument) -> Bibliography:
 
     citations = extract_citations(body_before_refs)
 
+    # solo el tramo de la lista: `reference_paragraphs()` ya corta en el
+    # siguiente encabezado / 'Anexos', y aqui se seguia hasta el final del
+    # documento. Los anexos (tablas de numeros, fichas, matrices) se parseaban
+    # como si fueran referencias y generaban cientos de avisos REF-006/007/008
+    # sobre contenido que no es ninguna referencia.
     references: list[ReferenceRecord] = []
-    if ref_start is not None:
-        for p in body:
-            if p.index <= ref_start:
-                continue
-            rec = parse_reference(p)
-            if rec.raw.strip():
-                references.append(rec)
+    for p in document.reference_paragraphs():
+        rec = parse_reference(p)
+        if rec.raw.strip():
+            references.append(rec)
 
     return Bibliography(
         citations=citations, references=references, references_start=ref_start

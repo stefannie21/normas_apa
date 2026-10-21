@@ -55,13 +55,26 @@ const Marker = (function () {
     close();
   }
 
+  /* El fragmento del backend es SIEMPRE el principio del parrafo, asi que se
+     exige que el parrafo EMPIECE por el y no que simplemente lo contenga: con
+     "lo contiene" un aviso de la lista de referencias acababa marcado en un
+     parrafo del cuerpo que repetia las mismas palabras ("Hipótesis General",
+     una tabla con el mismo numero...), y desde ahi "Corregir esto" no servia
+     de nada porque no era el sitio del aviso. */
+  function normText(s) {
+    return (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function startsWithFragment(el, fragment) {
+    const a = normText(el.textContent).slice(0, 30);
+    const b = normText(fragment).slice(0, 30).replace(/\.\.\.$/, "");
+    return a === b;
+  }
+
   function locate(f) {
     const all = blocks();
     if (f.excerpt && f.excerpt.length > 8) {
-      const needle = f.excerpt.slice(0, 30).toLowerCase();
-      const hit = all.find((el) =>
-        (el.textContent || "").toLowerCase().includes(needle)
-      );
+      const hit = all.find((el) => startsWithFragment(el, f.excerpt));
       if (hit) return hit;
     }
     if (f.paragraph_index != null && all[f.paragraph_index]) return all[f.paragraph_index];
@@ -233,7 +246,13 @@ const Marker = (function () {
       list.find((f) => f.severity === "error") ||
       list.find((f) => f.severity === "warning") ||
       list[0];
-    const isAuto = uniqueRules.some((r) => Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
+    const corregibles = uniqueRules.filter((r) =>
+      Fixer.CORRECTIONS.some((c) => c.rules.includes(r))
+    );
+    // reglas de este aviso sin correccion automatica (anio, formato, contenido):
+    // se dicen aqui mismo para no prometer una correccion que no va a llegar
+    const manuales = uniqueRules.filter((r) => !corregibles.includes(r));
+    const isAuto = corregibles.length > 0;
     const applicable = Fixer.CORRECTIONS.filter((c) =>
       uniqueRules.some((r) => c.rules.includes(r))
     );
@@ -258,6 +277,11 @@ const Marker = (function () {
          ${list.length > 1 ? `<span class="apa-pop-more">${list.length} avisos</span>` : ""}
        </div>
        <ul class="apa-pop-list">${msgs}</ul>
+       ${
+         isAuto && manuales.length
+           ? `<div class="apa-pop-note">Se corrige solo ${corregibles.join(" y ")}; ${manuales.join(" y ")} hay que revisarlo a mano.</div>`
+           : ""
+       }
        <div class="apa-pop-foot">
          ${
            isAuto

@@ -40,7 +40,7 @@ const Pager = (function () {
       padRight: toPx(s.right_in),
       contentW: Math.max(80, toPx(s.width_in - s.left_in - s.right_in)),
       contentH: Math.max(80, toPx(s.height_in - s.top_in - s.bottom_in)),
-      landscape: !!s.landscape,
+      landscape: !!(s.is_landscape !== undefined ? s.is_landscape : s.landscape),
     };
   }
 

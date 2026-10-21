@@ -204,49 +204,105 @@ def _paragraph_metrics(p) -> dict:
 
 
 def _sections_meta(doc) -> list[dict]:
-    """Geometria de cada seccion del docx (vertical/horizontal, tamaño y margenes).
+    """Geometria de cada seccion del docx (vertical/horizontal, tamano y margenes).
 
-    Word marca la orientacion con w:orient y muchas veces deja w:w/w:h en
-    medidas verticales, de modo que comparar ancho vs alto NO es suficiente.
+    Se leen los <w:sectPr> directamente del XML en orden de documento, incluidos
+    los que van dentro de <w:pPr> (cambios de seccion a mitad de documento), que
+    python-docx no expone en doc.sections y por eso antes se perdian hojas
+    horizontales.
     """
+    W = W_NS
+    TWIPS_PER_IN = 1440.0
+
+    def _twips_to_in(val, default):
+        if val is None:
+            return default
+        try:
+            return round(float(val) / TWIPS_PER_IN, 3)
+        except (TypeError, ValueError):
+            return default
+
+    # 1) Recoger todos los sectPr en orden de documento
+    sect_prs = []
+    try:
+        body = doc.element.body
+        for child in body.iterchildren():
+            if child.tag == W + "p":
+                ppr = child.find(W + "pPr")
+                if ppr is not None:
+                    sp = ppr.find(W + "sectPr")
+                    if sp is not None:
+                        sect_prs.append(sp)
+            elif child.tag == W + "sectPr":
+                sect_prs.append(child)
+    except Exception:
+        sect_prs = []
+
+    # fallback: si no se encontro ninguno, usar doc.sections
+    if not sect_prs:
+        try:
+            sect_prs = [s._sectPr for s in doc.sections]
+        except Exception:
+            sect_prs = []
+
+    # 2) Mapeo parrafo -> indice de seccion (como antes)
     section_of: list[int] = []
-    first_key: dict[int, str] = {}
     idx = 0
     for p in doc.paragraphs:
         section_of.append(idx)
+        try:
+            ppr = p._p.pPr
+            if ppr is not None and ppr.find(W + "sectPr") is not None:
+                idx += 1
+        except Exception:
+            pass
+
+    first_key: dict[int, str] = {}
+    for i, p in enumerate(doc.paragraphs):
+        sec = section_of[i] if i < len(section_of) else 0
         key = _text_key(p.text)
-        if key and idx not in first_key:
-            first_key[idx] = key
-        ppr = p._p.pPr
-        if ppr is not None and ppr.find(W_NS + "sectPr") is not None:
-            idx += 1
+        if key and sec not in first_key:
+            first_key[sec] = key
 
     out: list[dict] = []
-    for i, s in enumerate(doc.sections):
-        # A4 (21 x 29.7 cm) si el .docx no declara tamano de pagina
-        w = _in(s.page_width, DEFAULT_PAGE_W_IN)
-        h = _in(s.page_height, DEFAULT_PAGE_H_IN)
+    for i, sp in enumerate(sect_prs):
+        pg_sz = sp.find(W + "pgSz")
         orient = None
-        try:
-            pg_sz = s._sectPr.find(W_NS + "pgSz")
-            if pg_sz is not None:
-                orient = pg_sz.get(W_NS + "orient")
-        except Exception:
-            orient = None
+        w_twips = None
+        h_twips = None
+        if pg_sz is not None:
+            orient = pg_sz.get(W + "orient")
+            w_twips = pg_sz.get(W + "w")
+            h_twips = pg_sz.get(W + "h")
+        w = _twips_to_in(w_twips, DEFAULT_PAGE_W_IN)
+        h = _twips_to_in(h_twips, DEFAULT_PAGE_H_IN)
+        if w <= 0:
+            w = DEFAULT_PAGE_W_IN
+        if h <= 0:
+            h = DEFAULT_PAGE_H_IN
+
         landscape = orient == "landscape" or w > h
         if landscape and w < h:
             w, h = h, w
+
+        pg_mar = sp.find(W + "pgMar")
+        top = _twips_to_in(pg_mar.get(W + "top") if pg_mar is not None else None, 1.0)
+        bottom = _twips_to_in(pg_mar.get(W + "bottom") if pg_mar is not None else None, 1.0)
+        left = _twips_to_in(pg_mar.get(W + "left") if pg_mar is not None else None, 1.0)
+        right = _twips_to_in(pg_mar.get(W + "right") if pg_mar is not None else None, 1.0)
+
         out.append(
             {
                 "index": i,
                 "width_in": w,
                 "height_in": h,
-                "top_in": _in(s.top_margin, 1.0),
-                "bottom_in": _in(s.bottom_margin, 1.0),
-                "left_in": _in(s.left_margin, 1.0),
-                "right_in": _in(s.right_margin, 1.0),
+                "top_in": top,
+                "bottom_in": bottom,
+                "left_in": left,
+                "right_in": right,
                 "orient": orient or ("landscape" if landscape else "portrait"),
                 "landscape": landscape,
+                "is_landscape": landscape,
                 "first_key": first_key.get(i),
             }
         )

@@ -93,6 +93,24 @@ class SectionInfo:
 
 
 @dataclass
+class TableInfo:
+    index: int
+    caption_paragraph_index: int | None = None
+    caption_text: str = ""
+    has_caption_number: bool = False
+    title_italic: bool = False
+    has_header_row: bool = False
+    has_vertical_borders: bool = False
+    has_horizontal_borders: bool = False
+    cell_font_consistent: bool = True
+    cell_font_name: str | None = None
+    cell_font_size_pt: float | None = None
+    mentioned_in_text: bool = False
+    rows: int = 0
+    cols: int = 0
+
+
+@dataclass
 class ParsedDocument:
     filename: str
     paragraphs: list[ParagraphInfo]
@@ -101,19 +119,31 @@ class ParsedDocument:
     default_font_size_pt: float | None
     references_start: int | None = None
     bibliography: object | None = None
+    tables: list[TableInfo] = field(default_factory=list)
 
     @property
     def body_paragraphs(self) -> list[ParagraphInfo]:
         return [p for p in self.paragraphs if not p.is_empty]
 
     def reference_paragraphs(self) -> list[ParagraphInfo]:
+        """Parrafos de la lista de referencias (solo el tramo real).
+
+        Va desde el encabezado de 'Referencias' hasta el siguiente encabezado o
+        hasta 'Anexos' / 'Apéndices'. Antes se tomaba TODO lo que venia despues
+        del titulo, y en las tesis los anexos (y sus tablas de numeros) van
+        detras de las referencias: se colaban generando avisos REF-002/004/007
+        sobre contenido que no es ninguna referencia.
+        """
         if self.references_start is None:
             return []
-        return [
-            p
-            for p in self.paragraphs[self.references_start + 1 :]
-            if not p.is_empty
-        ]
+        out: list[ParagraphInfo] = []
+        for p in self.paragraphs[self.references_start + 1 :]:
+            if p.is_empty:
+                continue
+            if _is_references_end(p):
+                break
+            out.append(p)
+        return out
 
     def iter_text_indexed(self) -> Iterable[tuple[int, str]]:
         for p in self.paragraphs:
@@ -446,6 +476,188 @@ def image_sizes(data: bytes) -> list[dict]:
     return out
 
 
+def _extract_tables(doc: DocxDocument, paragraphs: list[ParagraphInfo], base_font: str | None, base_size: float | None) -> list[TableInfo]:
+    """Extrae las tablas del documento con su estructura basica.
+
+    Se recorre el cuerpo en orden para asociar a cada tabla el parrafo que la
+    precede (su posible rotulo 'Tabla N'). La estructura de celdas/bordes no
+    se recoge en los parrafos sueltos, por eso se lee aqui del XML.
+    """
+    tables: list[TableInfo] = []
+    last_para_idx: int | None = None
+    prev_para_idx: int | None = None
+    para_idx = 0
+    table_elements: list[tuple[object, int | None, int | None]] = []
+
+    def walk(el):
+        nonlocal last_para_idx, prev_para_idx, para_idx
+        for child in el.iterchildren():
+            tag = child.tag
+            if tag == W_NS + "p":
+                if para_idx < len(paragraphs) and not paragraphs[para_idx].is_empty:
+                    prev_para_idx = last_para_idx
+                    last_para_idx = para_idx
+                para_idx += 1
+            elif tag == W_NS + "tbl":
+                table_elements.append((child, last_para_idx, prev_para_idx))
+                # contar los parrafos dentro de la tabla (no actualizan last_para_idx)
+                para_idx += sum(1 for _ in child.iter(W_NS + "p"))
+            elif tag in (W_NS + "sdt", W_NS + "sdtContent"):
+                content = child.find(W_NS + "sdtContent")
+                if content is not None:
+                    walk(content)
+                else:
+                    walk(child)
+
+    try:
+        walk(doc.element.body)
+    except Exception:
+        return tables
+
+    for ti, (tbl_el, last_idx, prev_idx) in enumerate(table_elements, start=1):
+        info = TableInfo(index=ti)
+        # el rotulo 'Tabla N' suele estar en su propia linea, seguido del titulo
+        candidates = [i for i in (prev_idx, last_idx) if i is not None]
+        number_idx = None
+        for ci in candidates:
+            if ci < len(paragraphs) and re.match(
+                r"^(tabla|table)\s*\d+\b", paragraphs[ci].text.strip(), re.IGNORECASE
+            ):
+                number_idx = ci
+                break
+        if number_idx is None and candidates:
+            number_idx = candidates[-1]
+        info.caption_paragraph_index = number_idx
+        if number_idx is not None and number_idx < len(paragraphs):
+            num_para = paragraphs[number_idx]
+            info.caption_text = num_para.text.strip()
+            info.has_caption_number = bool(
+                re.match(r"^(tabla|table)\s*\d+\b", info.caption_text, re.IGNORECASE)
+            )
+            # el titulo es el parrafo siguiente al rotulo (si existe) o el mismo
+            title_idx = None
+            for ci in candidates:
+                if ci is not None and ci > number_idx:
+                    title_idx = ci
+                    break
+            if title_idx is None:
+                title_idx = number_idx
+            if title_idx < len(paragraphs):
+                title_para = paragraphs[title_idx]
+                if title_idx == number_idx:
+                    # titulo en la misma linea: contar cursivas tras el numero
+                    info.title_italic = any(r.italic for r in title_para.runs if r.text.strip())
+                else:
+                    info.title_italic = any(r.italic for r in title_para.runs if r.text.strip())
+                    if title_para.text.strip():
+                        info.caption_text = num_para.text.strip() + " " + title_para.text.strip()
+
+        # bordes
+        try:
+            tblPr = tbl_el.find(W_NS + "tblPr")
+            borders = tblPr.find(W_NS + "tblBorders") if tblPr is not None else None
+            if borders is not None:
+                def border_val(name):
+                    el = borders.find(W_NS + name)
+                    if el is None:
+                        return None
+                    return el.get(W_NS + "val")
+
+                def present(v):
+                    return v not in (None, "none", "nil")
+
+                info.has_horizontal_borders = (
+                    present(border_val("top"))
+                    or present(border_val("bottom"))
+                    or present(border_val("insideH"))
+                )
+                info.has_vertical_borders = (
+                    present(border_val("left"))
+                    or present(border_val("right"))
+                    or present(border_val("insideV"))
+                )
+        except Exception:
+            pass
+
+        # filas y columnas + encabezado en negrita
+        rows = list(tbl_el.iter(W_NS + "tr"))
+        info.rows = len(rows)
+        if rows:
+            first_row = rows[0]
+            cells = list(first_row.iterchildren(W_NS + "tc"))
+            info.cols = len(cells)
+            header_bold = info.cols > 0
+            for cell in cells:
+                cell_has_text = False
+                cell_all_bold = True
+                cell_any_text = False
+                for r_el in cell.iter(W_NS + "r"):
+                    rpr = r_el.find(W_NS + "rPr")
+                    bold = False
+                    if rpr is not None:
+                        b_el = rpr.find(W_NS + "b")
+                        if b_el is not None:
+                            val = b_el.get(W_NS + "val")
+                            bold = val not in ("0", "false")
+                    for t_el in r_el.iter(W_NS + "t"):
+                        if t_el.text and t_el.text.strip():
+                            cell_any_text = True
+                            if not bold:
+                                cell_all_bold = False
+                if cell_any_text and not cell_all_bold:
+                    header_bold = False
+                if not cell_any_text:
+                    # celda vacia no rompe el encabezado
+                    pass
+            info.has_header_row = header_bold
+
+        # fuente de las celdas
+        fonts: set[str] = set()
+        sizes: set[int] = set()
+        for r_el in tbl_el.iter(W_NS + "r"):
+            rpr = r_el.find(W_NS + "rPr")
+            if rpr is None:
+                continue
+            rfonts = rpr.find(W_NS + "rFonts")
+            if rfonts is not None:
+                for attr in ("ascii", "hAnsi"):
+                    v = rfonts.get(W_NS + attr)
+                    if v:
+                        fonts.add(v)
+            sz = rpr.find(W_NS + "sz")
+            if sz is not None:
+                v = sz.get(W_NS + "val")
+                if v:
+                    try:
+                        sizes.add(int(v) // 2)
+                    except ValueError:
+                        pass
+        info.cell_font_name = next(iter(fonts), None)
+        info.cell_font_size_pt = next(iter(sizes), None)
+        if base_font and fonts and base_font not in fonts:
+            info.cell_font_consistent = False
+        if base_size and sizes and base_size not in sizes:
+            info.cell_font_consistent = False
+        if not fonts and not sizes:
+            info.cell_font_consistent = True
+
+        tables.append(info)
+
+    # mencion en el texto: "Tabla N" en parrafos fuera de tabla
+    for info in tables:
+        needle = re.compile(rf"\btabla\s*{info.index}\b", re.IGNORECASE)
+        for p in paragraphs:
+            if p.in_table:
+                continue
+            if p.index == info.caption_paragraph_index:
+                continue
+            if needle.search(p.text):
+                info.mentioned_in_text = True
+                break
+
+    return tables
+
+
 def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
     doc: DocxDocument = Document(BytesIO(data))
 
@@ -514,6 +726,8 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
         except Exception:
             pass
 
+    tables = _extract_tables(doc, paragraphs, base_font, base_size)
+
     sections: list[SectionInfo] = []
     for i, section in enumerate(doc.sections):
         sections.append(
@@ -538,6 +752,7 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
         default_font=base_font,
         default_font_size_pt=base_size,
         references_start=references_start,
+        tables=tables,
     )
 
     # Capa 2: citas y referencias ya estructuradas (se inyecta aqui para que
@@ -546,6 +761,19 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
 
     parsed.bibliography = build_bibliography(parsed)
     return parsed
+
+
+REFERENCES_END_RE = re.compile(r"^(anexos?|ap[eé]ndices?)\b")
+
+
+def _is_references_end(p: ParagraphInfo) -> bool:
+    """Cierra la lista de referencias en el siguiente bloque de contenido nuevo."""
+    text = re.sub(r"\s+", " ", p.text.strip().lower())
+    text = re.sub(r"^[\d]+[.)]\s*", "", text).strip(" .:-–—")
+    # un encabezado cierra la lista, salvo que parezca una referencia citada
+    if p.style_name in HEADING_STYLES and not re.search(r"\(\d{4}\)", p.text):
+        return True
+    return bool(REFERENCES_END_RE.match(text))
 
 
 def _find_references_start(paragraphs: list[ParagraphInfo]) -> int | None:

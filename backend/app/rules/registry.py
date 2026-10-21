@@ -8,6 +8,7 @@ from backend.app.rules import (
     matching,
     ref_format,
     references,
+    tables,
 )
 from backend.app.rules.base import Rule
 
@@ -19,6 +20,7 @@ ALL_RULES: list[Rule] = [
     *ref_format.RULES,
     *cite_format.RULES,
     *matching.RULES,
+    *tables.RULES,
 ]
 
 

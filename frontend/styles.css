@@ -558,6 +558,29 @@ body.show-ruler .canvas::before {
   align-items: center;
   gap: 26px;
   padding: 32px 24px 90px;
+  /* las hojas horizontales son mas anchas que el area visible: se desplazan
+     horizontalmente en vez de quedar recortadas a la derecha */
+  overflow-x: auto;
+  overflow-y: visible;
+}
+/* marca visible para las hojas horizontales, que de otro modo se confunden
+   con las verticales cuando la ventana es estrecha */
+.sheet.landscape {
+  outline: 1px dashed rgba(74, 131, 181, .35);
+  width: 1122px !important;
+  min-height: 794px !important;
+  max-width: none !important;
+}
+.sheet.landscape::after {
+  content: "Hoja horizontal";
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(74, 131, 181, .7);
+  pointer-events: none;
 }
 
 .sheet {
@@ -862,6 +885,13 @@ body.reading #page { cursor: default; }
 .sev-warning .apa-pop-list b { background: #d99b26; }
 .sev-info .apa-pop-list b { background: #4a83b5; }
 .apa-pop-sug { display: block; color: #1f5c9e; font-size: .78rem; margin-top: 1px; }
+/* Se dice tambien lo que NO se puede corregir solo, para que el boton del pie
+   no parezca que arreglara tambien eso. */
+.apa-pop-note {
+  display: block; margin-top: 8px; padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: .74rem; line-height: 1.35;
+}
 .apa-pop-more {
   margin-left: auto;
   font-size: .72rem;

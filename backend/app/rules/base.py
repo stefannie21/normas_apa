@@ -19,6 +19,7 @@ class Category(str, Enum):
     TITULOS = "Títulos y jerarquía"
     CITAS = "Citas en el texto"
     REFERENCIAS = "Lista de referencias"
+    TABLAS = "Tablas"
     GENERAL = "Aspectos generales"
 
 
