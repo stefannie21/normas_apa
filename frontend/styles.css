@@ -35,6 +35,17 @@ body {
   overflow: hidden;
 }
 
+/* La seleccion por defecto del navegador es azul y tapa el texto que se esta
+   modificando: con un gris claro se sigue leyendo lo seleccionado. */
+::selection {
+  background: #d9dde2;
+  color: var(--ink);
+}
+::-moz-selection {
+  background: #d9dde2;
+  color: var(--ink);
+}
+
 .app { display: flex; height: 100vh; }
 
 .sb-main {
