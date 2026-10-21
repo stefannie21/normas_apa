@@ -76,89 +76,95 @@ def _add_logo(doc: Document) -> None:
         pass
 
 
-def _finding_bullet(doc: Document, f: dict) -> None:
-    """Un hallazgo como vineta: que es, donde esta y que hay que hacer.
+# Color de los titulos (el mismo azul del informe de comentarios del asesor)
+TITULO_COLOR = RGBColor(0x1B, 0x36, 0x5D)
 
-    En tres lineas para que se lea de un vistazo:
-      1. Gravedad | Categoria | Ubicacion (y el codigo de la regla)
-      2. El nombre claro de la regla + el detalle exacto
-      3. Que hacer (la correccion propuesta)
-    """
+
+def _etiqueta(doc: Document, texto: str, sangria: float = 0.32) -> object:
+    """Parrafo de vineta con la etiqueta en negrita y el texto detras."""
+    p = doc.add_paragraph(style="List Bullet")
+    p.paragraph_format.space_after = Pt(2)
+    p.paragraph_format.left_indent = Inches(sangria)
+    p.paragraph_format.first_line_indent = Inches(-0.16)
+    lab = p.add_run(texto)
+    lab.bold = True
+    lab.font.size = Pt(10.5)
+    return p
+
+
+def _observacion(doc: Document, f: dict) -> None:
+    """Una observacion con las tres lineas del informe de comentarios:
+    que se observo, donde esta y que hay que hacer."""
     sev = str(f.get("severity", "info"))
     rule_id = str(f.get("rule_id", ""))
-    category = str(f.get("category", "")).strip()
     location = str(f.get("location", "")).strip()
-
-    # --- linea 1: gravedad, categoria y ubicacion
-    p = doc.add_paragraph(style="List Bullet")
-    p.paragraph_format.space_after = Pt(0)
-    p.paragraph_format.left_indent = Inches(0.32)
-    p.paragraph_format.first_line_indent = Inches(-0.16)
-
-    sev_run = p.add_run(SEVERITY_LABEL.get(sev, sev).upper())
-    sev_run.bold = True
-    sev_run.font.size = Pt(9)
-    sev_run.font.color.rgb = SEVERITY_COLOR.get(sev, RGBColor(0x55, 0x55, 0x55))
-
-    sep = p.add_run("   |   ")
-    sep.font.size = Pt(9)
-    sep.font.color.rgb = RGBColor(0xA0, 0xA0, 0xA0)
-
-    if category:
-        cat_run = p.add_run(category)
-        cat_run.font.size = Pt(9)
-        cat_run.font.color.rgb = RGBColor(0x56, 0x65, 0x73)
-        sep2 = p.add_run("   |   ")
-        sep2.font.size = Pt(9)
-        sep2.font.color.rgb = RGBColor(0xA0, 0xA0, 0xA0)
-
-    if location:
-        loc_run = p.add_run(location)
-        loc_run.font.size = Pt(9)
-        loc_run.bold = True
-    if rule_id:
-        rid = p.add_run("  (" + rule_id + ")")
-        rid.font.size = Pt(8)
-        rid.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
-
-    # --- linea 2: la regla en lenguaje claro + el detalle preciso
-    det = doc.add_paragraph()
-    det.paragraph_format.left_indent = Inches(0.32)
-    det.paragraph_format.space_after = Pt(0)
-    name = RULE_NAMES.get(rule_id, "")
-    if name:
-        n_run = det.add_run(name)
-        n_run.bold = True
-        n_run.font.size = Pt(9.5)
-        det.add_run(" — ")
-    msg = str(f.get("message", "")).strip()
-    m_run = det.add_run(msg)
-    m_run.font.size = Pt(9.5)
-
-    # --- linea 3: que hacer
+    message = str(f.get("message", "")).strip()
     suggestion = str(f.get("suggestion", "")).strip()
-    if suggestion:
-        how = doc.add_paragraph()
-        how.paragraph_format.left_indent = Inches(0.32)
-        how.paragraph_format.space_after = Pt(0)
-        lbl = how.add_run("Qué hacer: ")
-        lbl.bold = True
-        lbl.font.size = Pt(9)
-        lbl.font.color.rgb = RGBColor(0x1E, 0x5C, 0x9E)
-        s_run = how.add_run(suggestion)
-        s_run.font.size = Pt(9)
-        s_run.font.color.rgb = RGBColor(0x1E, 0x5C, 0x9E)
-
-    # --- cita del texto donde esta el problema
     excerpt = str(f.get("excerpt", "")).strip()
+    name = RULE_NAMES.get(rule_id, "")
+
+    # --- Observacion
+    p = _etiqueta(doc, "Observación")
+    sev_run = p.add_run(" (" + SEVERITY_LABEL.get(sev, sev) + ")")
+    sev_run.bold = True
+    sev_run.font.size = Pt(9.5)
+    sev_run.font.color.rgb = SEVERITY_COLOR.get(sev, RGBColor(0x55, 0x55, 0x55))
+    p.add_run(": ")
+    if name:
+        n_run = p.add_run(name + ". ")
+        n_run.bold = True
+        n_run.font.size = Pt(10.5)
+    m_run = p.add_run(message)
+    m_run.font.size = Pt(10.5)
     if excerpt:
-        q = doc.add_paragraph()
-        q.paragraph_format.left_indent = Inches(0.32)
-        q.paragraph_format.space_after = Pt(6)
-        q_run = q.add_run("“" + excerpt[:180] + "”")
-        q_run.italic = True
-        q_run.font.size = Pt(8.5)
-        q_run.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+        e_run = p.add_run(' "' + excerpt[:220] + '"')
+        e_run.italic = True
+        e_run.font.size = Pt(9.5)
+        e_run.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+
+    # --- Ubicacion
+    u = _etiqueta(doc, "Ubicación en el Documento: ")
+    donde = location or "Sin ubicación precisa"
+    u_run = u.add_run(donde)
+    u_run.font.size = Pt(10.5)
+    if rule_id:
+        r = u.add_run("  (" + rule_id + ")")
+        r.font.size = Pt(8.5)
+        r.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+
+    # --- Accion de correccion
+    a = _etiqueta(doc, "Acción de Corrección Indicada: ")
+    if suggestion:
+        s_run = a.add_run(suggestion)
+        s_run.font.size = Pt(10.5)
+    else:
+        s_run = a.add_run("Revisar este punto manualmente: no se puede corregir de forma automática.")
+        s_run.font.size = Pt(10.5)
+        s_run.italic = True
+        s_run.font.color.rgb = RGBColor(0x56, 0x65, 0x73)
+
+
+def _seccion_heading(doc: Document, titulo: str, cuenta: dict) -> None:
+    """Encabezado de la seccion del documento, con el resumen de avisos."""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(12)
+    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.keep_with_next = True
+    run = p.add_run(titulo)
+    run.bold = True
+    run.font.size = Pt(10.5)
+    run.font.color.rgb = TITULO_COLOR
+    partes = []
+    if cuenta.get("error"):
+        partes.append(f"{cuenta['error']} error{'es' if cuenta['error'] > 1 else ''}")
+    if cuenta.get("warning"):
+        partes.append(f"{cuenta['warning']} aviso{'s' if cuenta['warning'] > 1 else ''}")
+    if cuenta.get("info"):
+        partes.append(f"{cuenta['info']} observaci{'ones' if cuenta['info'] > 1 else 'on'}")
+    if partes:
+        det = p.add_run("  (" + ", ".join(partes) + ")")
+        det.font.size = Pt(9)
+        det.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
 
 
 def build_report_docx(report: dict) -> bytes:
@@ -192,11 +198,16 @@ def build_report_docx(report: dict) -> bytes:
     # ------------------ Encabezado ------------------
     _add_logo(doc)
 
-    title = doc.add_heading("Informe de cumplimiento de normas APA", level=0)
-    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    t_run = title.add_run("INFORME DE COMENTARIOS Y OBSERVACIONES DEL DOCUMENTO")
+    t_run.bold = True
+    t_run.font.size = Pt(14)
+    t_run.font.color.rgb = TITULO_COLOR
 
     meta = doc.add_paragraph()
-    run = meta.add_run("Documento evaluado: ")
+    meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = meta.add_run("Documento: ")
     run.bold = True
     meta.add_run(str(filename))
     meta.add_run("\n")
@@ -258,8 +269,8 @@ def build_report_docx(report: dict) -> bytes:
             cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph()
 
-    # ------------------ Detalle de hallazgos (en vinetas) ------------------
-    doc.add_heading("Detalle de hallazgos", level=1)
+    # ------------------ Comentarios por seccion ------------------
+    doc.add_heading("Comentarios y observaciones por sección", level=1)
 
     if not findings:
         ok = doc.add_paragraph()
@@ -270,29 +281,56 @@ def build_report_docx(report: dict) -> bytes:
         _footer_note(doc)
         return _save(doc)
 
-    # leyenda rapida: que significa cada gravedad
-    legend = doc.add_paragraph()
-    legend.paragraph_format.space_after = Pt(10)
-    for key, text in (
-        ("error", ": hay que corregirlo antes de entregar.  "),
-        ("warning", ": conviene revisarlo.  "),
-        ("info", ": es un detalle de estilo."),
-    ):
-        lab = legend.add_run(SEVERITY_LABEL[key])
-        lab.bold = True
-        lab.font.size = Pt(9)
-        lab.font.color.rgb = SEVERITY_COLOR[key]
-        txt = legend.add_run(text)
-        txt.font.size = Pt(9)
-        txt.font.color.rgb = RGBColor(0x56, 0x65, 0x73)
-
-    # los errores primero: es lo primero que hay que arreglar
+    # Los errores primero: es lo primero que hay que corregir.
+    priority = {"error": 0, "warning": 1, "info": 2}
     ordered = sorted(
         findings,
-        key=lambda f: SEVERITY_ORDER.get(str(f.get("severity", "info")), 3),
+        key=lambda f: (
+            priority.get(str(f.get("severity", "info")), 3),
+            f.get("paragraph_index") if f.get("paragraph_index") is not None else 10**9,
+        ),
     )
+
+    # agrupar por seccion del documento
+    grupos: dict[str, list[dict]] = {}
     for f in ordered:
-        _finding_bullet(doc, f)
+        sec = str((f.get("extra") or {}).get("section") or "").strip()
+        grupos.setdefault(sec, []).append(f)
+
+    # los avisos que no son de un parrafo concreto van primero, bajo su propio
+    # encabezado: son de todo el documento (margenes, tipografia, orden...)
+    grupos_orden: list[tuple[str, list[dict]]] = []
+    generales = grupos.pop("", None)
+    if generales:
+        grupos_orden.append(("Aspectos generales del documento", generales))
+    for sec, lista in grupos.items():
+        grupos_orden.append((sec, lista))
+
+    # las secciones se ordenan como aparecen en el documento, no alfabeticamente:
+    # el asesor recorre la tesis de principio a fin
+    def _posicion(lista: list[dict]) -> int:
+        return min(
+            (f.get("paragraph_index") for f in lista if f.get("paragraph_index") is not None),
+            default=10**9,
+        )
+
+    grupos_orden.sort(key=lambda par: _posicion(par[1]))
+
+    for sec, lista in grupos_orden:
+        # dentro de la seccion, primero los errores y luego el orden del texto
+        lista = sorted(
+            lista,
+            key=lambda f: (
+                priority.get(str(f.get("severity", "info")), 3),
+                f.get("paragraph_index") if f.get("paragraph_index") is not None else 10**9,
+            ),
+        )
+        cuenta = {"error": 0, "warning": 0, "info": 0}
+        for f in lista:
+            cuenta[str(f.get("severity", "info"))] = cuenta.get(str(f.get("severity", "info")), 0) + 1
+        _seccion_heading(doc, sec, cuenta)
+        for f in lista:
+            _observacion(doc, f)
 
     ai_review = report.get("ai_review")
     if ai_review and ai_review.get("notes"):

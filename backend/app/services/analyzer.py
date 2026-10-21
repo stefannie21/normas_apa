@@ -34,6 +34,13 @@ def analyze(document: ParsedDocument) -> AnalysisResult:
             )
 
     findings.sort(key=lambda f: (f.paragraph_index if f.paragraph_index is not None else 10**9, f.rule_id))
+    # Se anota en que seccion (capitulo o apartado) esta cada aviso: el
+    # informe de comentarios se lee agrupado por secciones, no como una lista
+    # suelta de 477 lineas.
+    for f in findings:
+        section = document.section_title(f.paragraph_index)
+        if section:
+            f.extra["section"] = section
     result = AnalysisResult(filename=document.filename, findings=findings)
     result.summary = build_summary(document, findings)
     return result

@@ -120,6 +120,14 @@ class ParsedDocument:
     references_start: int | None = None
     bibliography: object | None = None
     tables: list[TableInfo] = field(default_factory=list)
+    # titulo de la seccion (encabezado) a la que pertenece cada parrafo
+    section_titles: list[str] = field(default_factory=list)
+
+    def section_title(self, index: int | None) -> str:
+        """Encabezado de la seccion donde esta el parrafo ("" si no hay)."""
+        if index is None or index < 0 or index >= len(self.section_titles):
+            return ""
+        return self.section_titles[index]
 
     @property
     def body_paragraphs(self) -> list[ParagraphInfo]:
@@ -476,6 +484,44 @@ def image_sizes(data: bytes) -> list[dict]:
     return out
 
 
+def _is_section_title(p: ParagraphInfo) -> bool:
+    """El parrafo hace de titulo de seccion.
+
+    Vale si usa estilo de encabezado de Word o si esta escrito a mano (en
+    negrita y suelto), que en las tesis es lo mas habitual. Se descartan las
+    celdas de tabla y los fragmentos sin letras ("%", "---"), que en negrita
+    abundan y no son titulos de nada.
+    """
+    if p.heading_level:
+        return True
+    text = p.text.strip()
+    if not text or p.is_list_item or p.in_table:
+        return False
+    if len(text) > 90 or len(text.split()) > 14:
+        return False
+    if text.endswith((".", ",", ";", ":")):
+        return False
+    if sum(1 for c in text if c.isalpha()) < 3:
+        return False
+    return p.all_bold
+
+
+def _section_titles(paragraphs: list[ParagraphInfo]) -> list[str]:
+    """Titulo de la seccion a la que pertenece cada parrafo.
+
+    Permite agrupar los avisos del informe por capitulo o apartado, como en el
+    informe de comentarios que entrega un asesor.
+    """
+    titles: list[str] = []
+    current = ""
+    for p in paragraphs:
+        text = p.text.strip()
+        if text and _is_section_title(p):
+            current = text
+        titles.append(current)
+    return titles
+
+
 def _extract_tables(doc: DocxDocument, paragraphs: list[ParagraphInfo], base_font: str | None, base_size: float | None) -> list[TableInfo]:
     """Extrae las tablas del documento con su estructura basica.
 
@@ -732,6 +778,7 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
             pass
 
     tables = _extract_tables(doc, paragraphs, base_font, base_size)
+    section_titles = _section_titles(paragraphs)
 
     sections: list[SectionInfo] = []
     for i, section in enumerate(doc.sections):
@@ -758,6 +805,7 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
         default_font_size_pt=base_size,
         references_start=references_start,
         tables=tables,
+        section_titles=section_titles,
     )
 
     # Capa 2: citas y referencias ya estructuradas (se inyecta aqui para que
