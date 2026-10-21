@@ -53,7 +53,7 @@ function go(name) {
 
   current = name;
   syncNav(name);
-  document.title = (spec.title ? spec.title + " · " : "") + "APA Studio";
+  document.title = (spec.title ? spec.title + " · " : "") + "CeaTesis";
 
   if (spec.shell) {
     if (view) view.hidden = true;
