@@ -7,7 +7,6 @@ corrige nada semantico (anios, autores, contenido). Solo formato ypunctuation
 const Fixer = (function () {
   "use strict";
 
-  const REFS_TITLE_RE = /^(referencias|reference|bibliograf[ií]a)/i;
   const IN = 96; // px por pulgada
 
   // ------------------------------------------------------------- utilidades
@@ -20,6 +19,32 @@ const Fixer = (function () {
      Sin el (corrector del panel, o documento entero) el ambito es #page. */
   function scopeOf(ctx) {
     return (ctx && ctx.el) || root();
+  }
+
+  // Titulos validos de la lista de referencias. Se replica la normalizacion
+  // del backend (_find_references_start) para que el corrector marque la
+  // MISMA lista que el verificador: minusculas, sin el numero inicial
+  // ("6. REFERENCIAS"), sin signos y sin las palabras "apa"/"bibliografica".
+  const REFS_TITLES = new Set([
+    "referencias",
+    "referencias bibliograficas",
+    "referencias bibliográficas",
+    "bibliografia",
+    "bibliografía",
+    "references",
+    "lista de referencias",
+  ]);
+
+  function isRefsTitle(text) {
+    let t = String(text || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    t = t.replace(/^[\d]+[.)]\s*/, "");
+    t = t.replace(/^[ .:\-–—]+/, "").replace(/[ .:\-–—]+$/, "");
+    t = t.replace(/\b(apa|bibliografica|bibliograficas|bibliografico)\b/g, " ");
+    t = t.replace(/\s+/g, " ").trim();
+    return REFS_TITLES.has(t);
   }
 
   // nodos que coinciden con el selector DENTRO del ambito (incluido el mismo)
@@ -49,12 +74,17 @@ const Fixer = (function () {
   function isReference(el) {
     const p = root();
     if (!p) return false;
-    let seenTitle = false;
-    for (const node of p.querySelectorAll("h1,h2,h3,p,li")) {
-      if (node === el) return seenTitle;
-      if (REFS_TITLE_RE.test((node.textContent || "").trim())) seenTitle = true;
-    }
-    return false;
+    const nodes = Array.from(p.querySelectorAll("h1,h2,h3,p,li"));
+    // Se toma el ULTIMO titulo que coincide, como hace el backend: en una
+    // tesis la palabra "referencias" puede aparecer antes (indice, capitulo
+    // de introduction...) y con el primero todo el cuerpo del documento
+    // contaba como lista de referencias.
+    let cut = -1;
+    nodes.forEach((node, i) => {
+      if (isRefsTitle(node.textContent)) cut = i;
+    });
+    if (cut < 0) return false;
+    return nodes.indexOf(el) > cut;
   }
 
   function normName(t) {
@@ -307,8 +337,15 @@ const Fixer = (function () {
         if (!p) return 0;
         let titleEl = null;
         p.querySelectorAll("h1,h2,h3").forEach((el) => {
-          if (REFS_TITLE_RE.test((el.textContent || "").trim())) titleEl = el;
+          if (isRefsTitle(el.textContent)) titleEl = el;
         });
+        // si el titulo esta escrito como parrafo en negrita y no como
+        // encabezado, se busca igual (pero solo si no hay ninguno)
+        if (!titleEl) {
+          p.querySelectorAll("p").forEach((el) => {
+            if (isRefsTitle(el.textContent)) titleEl = el;
+          });
+        }
         if (!titleEl) return 0;
         const host = titleEl.parentNode;
         const refs = [];

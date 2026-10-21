@@ -425,6 +425,10 @@ const Pager = (function () {
     sheet.className = "sheet" + (g.landscape ? " landscape" : "");
     sheet.dataset.section = String(sectionIndex);
     sheet.style.setProperty("--content-h", g.contentH + "px");
+    // el CSS fuerza el tamano de las hojas horizontales con !important: se le
+    // pasa el ancho y alto reales de la seccion para que no sea un valor fijo
+    sheet.style.setProperty("--landscape-w", g.width + "px");
+    sheet.style.setProperty("--landscape-h", g.height + "px");
     sheet.style.width = g.width + "px";
     sheet.style.minHeight = g.height + "px";
     sheet.style.paddingTop = g.padTop + "px";

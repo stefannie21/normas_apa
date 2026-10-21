@@ -634,11 +634,16 @@ def _extract_tables(doc: DocxDocument, paragraphs: list[ParagraphInfo], base_fon
                         pass
         info.cell_font_name = next(iter(fonts), None)
         info.cell_font_size_pt = next(iter(sizes), None)
-        if base_font and fonts and base_font not in fonts:
+        # la fuente de las celdas tiene que ser UNA sola y la misma que la
+        # del cuerpo: si hay dos fuentes distintas dentro de la tabla, tampoco
+        # es consistente aunque una de ellas sea la del documento
+        if len(fonts) > 1 or len(sizes) > 1:
             info.cell_font_consistent = False
-        if base_size and sizes and base_size not in sizes:
+        elif fonts and base_font and base_font not in fonts:
             info.cell_font_consistent = False
-        if not fonts and not sizes:
+        elif sizes and base_size and base_size not in sizes:
+            info.cell_font_consistent = False
+        elif not fonts and not sizes:
             info.cell_font_consistent = True
 
         tables.append(info)

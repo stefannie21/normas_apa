@@ -68,7 +68,10 @@ const Marker = (function () {
   function startsWithFragment(el, fragment) {
     const a = normText(el.textContent).slice(0, 30);
     const b = normText(fragment).slice(0, 30).replace(/\.\.\.$/, "");
-    return a === b;
+    // prefijo, no igualdad: si el fragmento es mas corto que 30 letras
+    // ("Hipotesis General") el parrafo sigue empezando por el, y con la
+    // igualdad el aviso se quedaba sin marcar
+    return !!b && a.startsWith(b);
   }
 
   function locate(f) {

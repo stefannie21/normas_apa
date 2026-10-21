@@ -575,11 +575,13 @@ body.show-ruler .canvas::before {
   overflow-y: visible;
 }
 /* marca visible para las hojas horizontales, que de otro modo se confunden
-   con las verticales cuando la ventana es estrecha */
+   con las verticales cuando la ventana es estrecha. El tamano lo pone el
+   paginador con la geometria de la seccion (--landscape-w / --landscape-h);
+   el !important asegura que ninguna regla fija lo aplaste. */
 .sheet.landscape {
   outline: 1px dashed rgba(74, 131, 181, .35);
-  width: 1122px !important;
-  min-height: 794px !important;
+  width: var(--landscape-w, 1122px) !important;
+  min-height: var(--landscape-h, 794px) !important;
   max-width: none !important;
 }
 .sheet.landscape::after {
@@ -881,7 +883,6 @@ body.reading #page { cursor: default; }
 .finding-sug .icn { display: inline-flex; flex: 0 0 auto; margin-top: 1px; }
 .finding-sug .icn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
 .finding-sug b { font-weight: 700; }
-.finding-loc { margin: 4px 0 0; font-size: .7rem; color: #96a0ac; }
 .empty-pane { color: var(--muted); font-size: .85rem; text-align: center; padding: 20px 8px; }
 
 /* ---------- Barra de estado ---------- */
@@ -963,14 +964,6 @@ body.reading #page { cursor: default; }
 .sev-warning .apa-pop-tag { background: #fdf0d8; color: #96690d; }
 .sev-info .apa-pop-tag { background: #e2eefb; color: #2b5d85; }
 .apa-pop-rule { font-family: ui-monospace, Consolas, monospace; font-size: .76rem; color: var(--muted); }
-.apa-pop-text {
-  margin: 0 0 10px;
-  color: var(--ink);
-  line-height: 1.45;
-  max-height: 92px;
-  overflow: hidden;
-  font-style: italic;
-}
 .apa-pop-foot { display: flex; align-items: center; gap: 8px; }
 .apa-pop-list {
   margin: 0 0 10px;
@@ -1006,18 +999,6 @@ body.reading #page { cursor: default; }
   background: #f0f2f5;
   border-radius: 10px;
   padding: 1px 8px;
-}
-.apa-pop-msg {
-  margin: 0 0 6px;
-  color: var(--ink);
-  line-height: 1.45;
-  font-weight: 600;
-}
-.apa-pop-fix {
-  margin: 0 0 6px;
-  color: #1f5c9e;
-  line-height: 1.45;
-  font-size: .8rem;
 }
 .apa-pop-fixbtn {
   background: var(--accent);
