@@ -682,6 +682,55 @@ body.reading #page { cursor: default; }
 /* ---------- Informe (vista Reportes) ---------- */
 .pane-body { padding: 14px; }
 
+/* ---------- Panel del informe junto al documento ----------
+   Recuadro que aparece al pulsar "Verificar documento": lista los errores,
+   advertencias y observaciones sin salir de la vista de edicion. */
+.report-pane {
+  flex: 0 0 340px; max-width: 40vw;
+  background: #fff; border-right: 1px solid var(--line-strong);
+  display: flex; flex-direction: column; min-height: 0;
+  box-shadow: 1px 0 8px rgba(16,24,40,.05);
+}
+.pane-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--line);
+}
+.pane-head-icn { display: inline-flex; color: var(--accent); }
+.pane-head-icn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+.pane-head h2 { margin: 0; font-size: .92rem; color: var(--ink); flex: 1; }
+.pane-close {
+  background: none; border: none;
+  font-size: 1.2rem; line-height: 1;
+  color: var(--muted); cursor: pointer;
+  padding: 2px 6px; border-radius: 6px;
+}
+.pane-close:hover { background: #f0f3f7; color: var(--ink); }
+.report-pane .pane-body { overflow-y: auto; flex: 1 1 auto; }
+.report-pane .pane-score { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.report-pane .pane-score .score { margin-bottom: 0; }
+.report-pane .score-ring { width: 64px; height: 64px; }
+.report-pane .score-ring::before { inset: 7px; }
+.report-pane .score-ring span { font-size: 1.1rem; }
+.report-pane .score-ring small { font-size: .7rem; }
+.report-pane .score-label { margin-top: 0; font-size: .8rem; color: var(--muted); }
+/* las tarjetas del panel son compactas: dos por fila */
+.report-pane .pane-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
+.report-pane .pane-card { padding: 7px 9px; }
+.report-pane .pane-card .pc-num { font-size: 1.15rem; }
+.report-pane .pane-card .pc-label { font-size: .72rem; }
+/* dentro del panel el hallazgo va en columna: no cabe a lo ancho */
+.report-pane .finding { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; }
+.report-pane .finding-rail { order: -1; }
+.report-pane .finding-side { display: none; }
+.report-pane .finding-rule { margin-left: auto; }
+.pane-all {
+  display: block; width: 100%; margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong); border-radius: 9px;
+  background: #fff; color: var(--accent); font: inherit; font-size: .82rem; cursor: pointer;
+}
+.pane-all:hover { background: var(--accent-soft); border-color: #b9d2f2; }
+
 /* El anillo refleja el porcentaje real (--pct lo pone la vista). Antes era un
    borde con un cuarto coloreado fijo, asi que un documento con 0 % mostraba
    igualmente un trozo azul. */

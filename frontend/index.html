@@ -71,6 +71,24 @@
     </nav>
 
     <main class="workspace">
+      <aside class="report-pane" id="report-pane" hidden>
+        <div class="pane-head">
+          <span class="pane-head-icn" data-icon="chart"></span>
+          <h2>Informe del documento</h2>
+          <button class="pane-close" id="pane-close" title="Cerrar"
+            aria-label="Cerrar el informe">&times;</button>
+        </div>
+        <div class="pane-body">
+          <div class="pane-score">
+            <div class="score-ring"><span id="pane-score">--</span><small>%</small></div>
+            <div class="score-label">Nivel de cumplimiento</div>
+          </div>
+          <div class="pane-cards" id="pane-cards"></div>
+          <div class="pane-filters" id="pane-filters"></div>
+          <div class="findings" id="pane-findings"></div>
+          <button class="pane-all" id="pane-all">Ver el informe completo</button>
+        </div>
+      </aside>
       <section class="canvas" id="canvas">
         <div class="page" id="page" contenteditable="false" spellcheck="false"></div>
         <div class="empty-state" id="empty-state">

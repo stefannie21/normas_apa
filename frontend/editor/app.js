@@ -12,6 +12,7 @@ import { Library } from "../library.js";
 const App = (function () {
   "use strict";
   const SEVERITY_ICON = { error: "!", warning: "!", info: "i" };
+  const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
 
   const page = document.getElementById("page");
   const emptyState = document.getElementById("empty-state");
@@ -27,6 +28,16 @@ const App = (function () {
   const zoomRange = document.getElementById("zoom-range");
   const toast = document.getElementById("toast");
 
+  /* Panel del informe que aparece junto al documento al verificar */
+  const reportPane = document.getElementById("report-pane");
+  const paneClose = document.getElementById("pane-close");
+  const paneScore = document.getElementById("pane-score");
+  const paneCards = document.getElementById("pane-cards");
+  const paneFilters = document.getElementById("pane-filters");
+  const paneFindings = document.getElementById("pane-findings");
+  const paneAll = document.getElementById("pane-all");
+  let paneFilter = "all";
+
   let currentFile = null;
   let currentFindings = [];
   let allFindings = []; // copia integra del informe, sin filtrar
@@ -40,7 +51,7 @@ const App = (function () {
     "ai-review": runAiReview,
     "ai-revoke": revokeAiConsent,
     "fix-doc": openFixModal,
-    "toggle-pane": () => Router.go("reportes"),
+    "toggle-pane": () => togglePane(),
     "clear-marks": clearMarks,
     "page-break": () => {
       insertHtml('<div class="page-break"></div>');
@@ -571,13 +582,14 @@ const App = (function () {
       }
       const report = await res.json();
       renderReport(report);
+      // el recuadro del informe aparece junto al documento
+      openPane();
       Library.syncAnalysis(report.summary, currentFile && currentFile.name).catch(() => {
         /* sin biblioteca no se rompe nada */
       });
       statusMsg.textContent = "";
       const total = (report.summary && report.summary.total_findings) || (report.findings || []).length;
-      // el informe ya no aparece junto al documento: se avisa donde esta
-      showToast("Informe generado: " + total + " hallazgos. Está en la sección Reportes.", "ok");
+      showToast("Informe generado: " + total + " hallazgos.", "ok");
     } catch (err) {
       statusMsg.textContent = "";
       showToast("No se pudo analizar: " + err.message, "error");
@@ -585,6 +597,127 @@ const App = (function () {
       analyzeBtn.disabled = false;
     }
   }
+
+  /* ---------- Panel del informe junto al documento ----------
+     Recuadro lateral con los errores, advertencias y observaciones del
+     documento. Se abre al pulsar "Verificar documento" y se cierra con la X. */
+  function openPane() {
+    if (!reportPane) return;
+    reportPane.hidden = false;
+    renderPane();
+  }
+
+  function closePane() {
+    if (!reportPane) return;
+    reportPane.hidden = true;
+  }
+
+  function togglePane() {
+    if (!reportPane) return;
+    if (reportPane.hidden) openPane();
+    else closePane();
+  }
+
+  function renderPane() {
+    if (!reportPane) return;
+    const c = countBy(currentFindings);
+    const score =
+      lastSummary && lastSummary.compliance_score != null ? lastSummary.compliance_score : null;
+    if (paneScore) paneScore.textContent = score == null ? "--" : score;
+    const ring = reportPane.querySelector(".score-ring");
+    if (ring) {
+      const pct = score == null ? 0 : Math.max(0, Math.min(100, Number(score) || 0));
+      ring.style.setProperty("--pct", String(pct));
+      ring.style.setProperty(
+        "--ring-color",
+        score == null
+          ? "var(--accent-soft)"
+          : pct < 50
+            ? "var(--error)"
+            : pct < 75
+              ? "var(--warning)"
+              : "var(--accent)"
+      );
+    }
+    if (paneCards) {
+      paneCards.innerHTML = [
+        ["error", c.error || 0, "Errores"],
+        ["warning", c.warning || 0, "Avisos"],
+        ["info", c.info || 0, "Observ."],
+        ["", c.all || 0, "Total"],
+      ]
+        .map(
+          ([clase, valor, texto]) =>
+            `<div class="pane-card ${clase}"><div class="pc-num">${valor}</div><div class="pc-label">${texto}</div></div>`
+        )
+        .join("");
+    }
+    if (paneFilters) {
+      const filtros = [
+        ["all", "Todos"],
+        ["error", "Errores"],
+        ["warning", "Avisos"],
+        ["info", "Observ."],
+      ];
+      paneFilters.innerHTML = filtros
+        .map(
+          ([k, texto]) =>
+            `<button data-pfilter="${k}" class="${paneFilter === k ? "active" : ""}">${texto} <b>${c[k] || 0}</b></button>`
+        )
+        .join("");
+      paneFilters.querySelectorAll("[data-pfilter]").forEach((b) =>
+        b.addEventListener("click", () => {
+          paneFilter = b.dataset.pfilter;
+          renderPane();
+        })
+      );
+    }
+    if (!paneFindings) return;
+    const lista =
+      paneFilter === "all"
+        ? currentFindings
+        : currentFindings.filter((f) => f.severity === paneFilter);
+    if (!lista.length) {
+      paneFindings.innerHTML = `<p class="empty-pane">${
+        currentFindings.length
+          ? "Sin hallazgos en esta categoría."
+          : "Aún no se ha verificado el documento."
+      }</p>`;
+      return;
+    }
+    paneFindings.innerHTML = lista
+      .map((f) => {
+        const idx = currentFindings.indexOf(f);
+        return `<article class="finding ${escapeHtml(f.severity || "")}" data-pi="${idx}">
+          <div class="finding-rail">
+            <span class="dot">${SEVERITY_ICON[f.severity] || ""}</span>
+            <span class="finding-sev">${SEV_TEXT[f.severity] || ""}</span>
+          </div>
+          <div class="finding-body">
+            <div class="finding-head">
+              <span class="finding-cat">${escapeHtml(f.category || "")}</span>
+              <span class="finding-rule">${escapeHtml(f.rule_id || "")}</span>
+            </div>
+            <p class="finding-msg">${escapeHtml(f.message || "")}</p>
+            ${
+              f.suggestion
+                ? `<p class="finding-sug"><b>Sugerencia:</b> ${escapeHtml(f.suggestion)}</p>`
+                : ""
+            }
+          </div>
+        </article>`;
+      })
+      .join("");
+    paneFindings.querySelectorAll(".finding").forEach((art) =>
+      art.addEventListener("click", () => {
+        const f = currentFindings[Number(art.dataset.pi)];
+        if (f) jumpToFinding(f);
+      })
+    );
+  }
+
+  if (paneClose) paneClose.addEventListener("click", closePane);
+  if (paneAll) paneAll.addEventListener("click", () => openReportes());
 
   /* El informe ya no se dibuja en un panel pegado al documento: la vista
      "Reportes" lo pinta a partir de este estado. */
@@ -604,6 +737,12 @@ const App = (function () {
     lastSummary = null;
     aiFindings = [];
     resolvedIdx.clear();
+    if (paneFindings) {
+      paneFindings.innerHTML = '<p class="empty-pane">Aún no se ha verificado el documento.</p>';
+    }
+    if (paneCards) paneCards.innerHTML = "";
+    if (paneFilters) paneFilters.innerHTML = "";
+    if (paneScore) paneScore.textContent = "--";
     notifyChange();
   }
 
@@ -626,6 +765,8 @@ const App = (function () {
     }
     refreshCurrentFindings();
     markInDocument();
+    // el panel del informe se repinta con estos numeros
+    if (reportPane && !reportPane.hidden) renderPane();
     // la vista Reportes y el panel de Inicio se repintan con estos numeros
     notifyChange();
   }
@@ -1508,7 +1649,7 @@ const App = (function () {
       );
       refreshMarksAfterFix(res, markFindings);
     },
-    openReport: () => openReportes(),
+    openReport: () => openPane(),
   });
 
   /* ---------- Init ---------- */
