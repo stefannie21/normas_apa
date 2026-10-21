@@ -684,20 +684,31 @@ body.reading #page { cursor: default; }
 
 /* ---------- Panel del informe junto al documento ----------
    Recuadro que aparece al pulsar "Verificar documento": lista los errores,
-   advertencias y observaciones sin salir de la vista de edicion. */
+   advertencias y observaciones sin salir de la vista de edicion. Va a la
+   derecha del documento, junto a la barra de herramientas. */
 .report-pane {
   flex: 0 0 340px; max-width: 40vw;
-  background: #fff; border-right: 1px solid var(--line-strong);
+  background: #fff; border-left: 1px solid var(--line-strong);
   display: flex; flex-direction: column; min-height: 0;
-  box-shadow: 1px 0 8px rgba(16,24,40,.05);
+  box-shadow: -1px 0 8px rgba(16,24,40,.05);
 }
 .pane-head {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; border-bottom: 1px solid var(--line);
+  background: #fafbfd;
 }
 .pane-head-icn { display: inline-flex; color: var(--accent); }
 .pane-head-icn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
 .pane-head h2 { margin: 0; font-size: .92rem; color: var(--ink); flex: 1; }
+.pane-filters-btn {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 1px solid transparent; border-radius: 7px;
+  background: none; color: var(--muted); cursor: pointer;
+}
+.pane-filters-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.pane-filters-btn:hover { background: #eef2f7; color: var(--ink); }
+.pane-filters-btn.active { background: var(--accent-soft); border-color: #b9d2f2; color: var(--accent); }
 .pane-close {
   background: none; border: none;
   font-size: 1.2rem; line-height: 1;
@@ -706,18 +717,33 @@ body.reading #page { cursor: default; }
 }
 .pane-close:hover { background: #f0f3f7; color: var(--ink); }
 .report-pane .pane-body { overflow-y: auto; flex: 1 1 auto; }
-.report-pane .pane-score { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.report-pane .pane-score .score { margin-bottom: 0; }
-.report-pane .score-ring { width: 64px; height: 64px; }
+/* cumplimiento: anillo a la izquierda y el titulo al lado */
+.report-pane .pane-score {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px; margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.report-pane .score-ring { width: 62px; height: 62px; flex: 0 0 62px; }
 .report-pane .score-ring::before { inset: 7px; }
-.report-pane .score-ring span { font-size: 1.1rem; }
+.report-pane .score-ring span { font-size: 1.05rem; }
 .report-pane .score-ring small { font-size: .7rem; }
-.report-pane .score-label { margin-top: 0; font-size: .8rem; color: var(--muted); }
-/* las tarjetas del panel son compactas: dos por fila */
-.report-pane .pane-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
-.report-pane .pane-card { padding: 7px 9px; }
-.report-pane .pane-card .pc-num { font-size: 1.15rem; }
+.report-pane .score-label { font-size: .84rem; font-weight: 600; color: var(--ink); }
+/* las tarjetas del panel van de dos en dos */
+.report-pane .pane-cards { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.report-pane .pane-card { padding: 8px 10px; }
+.report-pane .pane-card .pc-num { font-size: 1.2rem; }
 .report-pane .pane-card .pc-label { font-size: .72rem; }
+/* los filtros de gravedad, en una sola linea con salto si no caben */
+.report-pane .pane-filters { margin-bottom: 10px; }
+/* chips de categoria (los abre el boton de embudo) */
+.report-pane .pane-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.report-pane .pane-cats button {
+  border: 1px solid var(--line); background: #fff; color: var(--muted);
+  border-radius: 999px; padding: 3px 10px; font: inherit; font-size: .74rem; cursor: pointer;
+}
+.report-pane .pane-cats button b { font-weight: 700; }
+.report-pane .pane-cats button:hover { border-color: #b9d2f2; color: var(--accent); }
+.report-pane .pane-cats button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 /* dentro del panel el hallazgo va en columna: no cabe a lo ancho */
 .report-pane .finding { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; }
 .report-pane .finding-rail { order: -1; }

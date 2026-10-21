@@ -36,7 +36,10 @@ const App = (function () {
   const paneFilters = document.getElementById("pane-filters");
   const paneFindings = document.getElementById("pane-findings");
   const paneAll = document.getElementById("pane-all");
+  const paneFiltersBtn = document.getElementById("pane-filters-btn");
+  const paneCats = document.getElementById("pane-cats");
   let paneFilter = "all";
+  let paneCategory = "";
 
   let currentFile = null;
   let currentFindings = [];
@@ -673,14 +676,44 @@ const App = (function () {
       );
     }
     if (!paneFindings) return;
-    const lista =
-      paneFilter === "all"
-        ? currentFindings
-        : currentFindings.filter((f) => f.severity === paneFilter);
+    // chips de categoria: se abren con el boton de embudo
+    const cats = new Map();
+    currentFindings.forEach((f) => {
+      const k = f.category || "Sin categoría";
+      cats.set(k, (cats.get(k) || 0) + 1);
+    });
+    const listaCats = Array.from(cats.entries()).sort((a, b) => b[1] - a[1]);
+    if (paneCats) {
+      if (!listaCats.length) {
+        paneCats.innerHTML = "";
+      } else {
+        paneCats.innerHTML = [
+          `<button data-pcat="" class="${paneCategory ? "" : "active"}">Todas <b>${currentFindings.length}</b></button>`,
+        ]
+          .concat(
+            listaCats.map(
+              ([c, n]) =>
+                `<button data-pcat="${escapeHtml(c)}" class="${paneCategory === c ? "active" : ""}">${escapeHtml(c)} <b>${n}</b></button>`
+            )
+          )
+          .join("");
+        paneCats.querySelectorAll("[data-pcat]").forEach((b) =>
+          b.addEventListener("click", () => {
+            paneCategory = b.dataset.pcat || "";
+            renderPane();
+          })
+        );
+      }
+    }
+    const lista = currentFindings.filter(
+      (f) =>
+        (paneFilter === "all" || f.severity === paneFilter) &&
+        (!paneCategory || f.category === paneCategory)
+    );
     if (!lista.length) {
       paneFindings.innerHTML = `<p class="empty-pane">${
         currentFindings.length
-          ? "Sin hallazgos en esta categoría."
+          ? "Sin hallazgos con estos filtros."
           : "Aún no se ha verificado el documento."
       }</p>`;
       return;
@@ -718,6 +751,16 @@ const App = (function () {
 
   if (paneClose) paneClose.addEventListener("click", closePane);
   if (paneAll) paneAll.addEventListener("click", () => openReportes());
+  if (paneFiltersBtn) {
+    paneFiltersBtn.addEventListener("click", () => {
+      if (!paneCats) return;
+      const visible = paneCats.hasAttribute("hidden");
+      if (visible) paneCats.removeAttribute("hidden");
+      else paneCats.setAttribute("hidden", "");
+      paneFiltersBtn.classList.toggle("active", visible);
+      paneFiltersBtn.setAttribute("aria-expanded", visible ? "true" : "false");
+    });
+  }
 
   /* El informe ya no se dibuja en un panel pegado al documento: la vista
      "Reportes" lo pinta a partir de este estado. */
@@ -742,6 +785,15 @@ const App = (function () {
     }
     if (paneCards) paneCards.innerHTML = "";
     if (paneFilters) paneFilters.innerHTML = "";
+    if (paneCats) {
+      paneCats.innerHTML = "";
+      paneCats.setAttribute("hidden", "");
+    }
+    if (paneFiltersBtn) {
+      paneFiltersBtn.classList.remove("active");
+      paneFiltersBtn.setAttribute("aria-expanded", "false");
+    }
+    paneCategory = "";
     if (paneScore) paneScore.textContent = "--";
     notifyChange();
   }
