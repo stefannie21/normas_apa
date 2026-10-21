@@ -156,7 +156,7 @@ function render() {
               </button></li>
               <li><button data-act="correccion">
                 <span class="tv-act-icn">${icon("check")}</span>
-                <span><strong>Ver correcciones</strong><small>Revisa los hallazgos del documento abierto</small></span>
+                <span><strong>Editar documento</strong><small>Revisa los hallazgos del documento abierto</small></span>
                 <span class="tv-chev">&gt;</span>
               </button></li>
               <li><button data-act="plantillas">

@@ -120,7 +120,7 @@ function render() {
           <h1>Reportes</h1>
           <p>Resumen del cumplimiento y el detalle de los hallazgos del documento.</p>
         </div>
-        <button class="rv-back" data-act="volver">Volver a Corrección</button>
+        <button class="rv-back" data-act="volver">Volver al documento</button>
         <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
           title="Descargar el informe APA en un documento Word (.docx)"
           aria-label="Descargar el informe APA en Word">${icon("download")}</button>

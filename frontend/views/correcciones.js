@@ -1,4 +1,4 @@
-/* Vista Correcciones.
+/* Vista Editar documento (clave interna: "correcciones").
 
 No dibuja nada: es la vista "shell" que muestra el editor, que ya está montado
 en la página. El router se encarga de enseñar la cinta, el área de trabajo y la
@@ -10,7 +10,7 @@ import { Router } from "../core/router.js";
     "use strict";
 
     Router.register("correcciones", {
-      title: "Correcciones",
+      title: "Editar documento",
       icon: "wand",
       order: 30,
       shell: true,
