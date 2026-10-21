@@ -1,5 +1,5 @@
 ﻿/* Iconos SVG en linea (sin dependencias externas). */
-(function () {
+const Icons = (function () {
   "use strict";
   const ICONS = {
     // menú lateral
@@ -9,6 +9,7 @@
     wand: '<path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/><path d="M4 5h4"/><path d="M4 9h3"/>',
     chart: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
+    shield: '<path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
     chevron: '<path d="M14 6l-6 6 6 6"/>',
     menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
     download: '<path d="M12 4v10"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
@@ -74,10 +75,9 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     });
   }
 
-  window.Icons = { svg, hydrate };
-  window.hydrateIcons = hydrate;
-
-  document.addEventListener("DOMContentLoaded", () => hydrate(document));
+  return { svg, hydrate };
 })();
+
+export { Icons };
 
 

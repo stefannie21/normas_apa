@@ -1,6 +1,8 @@
 /* Comandos de edicion del documento. Independientes de la interfaz: los usa
-   el panel lateral y tambien funcionan si en el futuro se anade una barra. */
-(function () {
+     el panel lateral y tambien funcionan si en el futuro se anade una barra. */
+import { History } from "./history.js";
+
+const Commands = (function () {
   "use strict";
 
   function page() {
@@ -16,8 +18,8 @@
   function exec(cmd) {
     // Deshacer y rehacer los lleva el historial de la aplicacion: el del
     // navegador se vacia en cuanto el documento se repagina o se marca.
-    if (cmd === "undo") return window.History && window.History.undo();
-    if (cmd === "redo") return window.History && window.History.redo();
+    if (cmd === "undo") return History.undo();
+    if (cmd === "redo") return History.redo();
     // La sangria NO puede pasar por execCommand: el navegador envuelve el
     // contenido en <blockquote> y, como #page esta partido en hojas, arrastra
     // la hoja entera dentro: el documento se parte en dos paginas y dos
@@ -82,7 +84,7 @@
     });
     // Cada pulsacion es un paso propio de deshacer, y no se agrupa con la
     // siguiente: repetirla cuatro veces se deshace cuatro veces.
-    if (window.History && window.History.flush) window.History.flush();
+    if (History.flush) History.flush();
     return true;
   }
 
@@ -149,16 +151,18 @@ function contentBlocks() {
     });
   }
 
-  window.Commands = {
-    exec,
-    applyColor,
-    applyToBlocks,
-    applyFontFamily,
-    applyFontSize,
-    applyIndent,
-    focusPage,
-    refresh,
-    contentBlocks,
-    selectedBlocks,
-  };
-})();
+    return {
+      exec,
+      applyColor,
+      applyToBlocks,
+      applyFontFamily,
+      applyFontSize,
+      applyIndent,
+      focusPage,
+      refresh,
+      contentBlocks,
+      selectedBlocks,
+    };
+  })();
+
+export { Commands };

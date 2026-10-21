@@ -368,17 +368,55 @@ def report_docx_endpoint(file: UploadFile = File(...)):
     )
 
 
+@router.post("/ai/preview")
+def ai_preview_endpoint(file: UploadFile = File(...)) -> JSONResponse:
+    """Que se enviaria a la IA, SIN llamarla.
+
+    Permite que la interfaz pida consentimiento mostrando el alcance real: numero
+    de referencias y citas, el tamanio maximo del payload y la garantia de que el
+    texto completo de la tesis nunca se envia.
+    """
+    settings = get_settings()
+    document = _load_doc(file)
+    summary = ai_reviewer.summarize_payload(document.bibliography)
+    summary["ai_enabled"] = settings.ai_available
+    summary["provider"] = settings.provider
+    summary["model"] = settings.resolved_model
+    return JSONResponse(summary)
+
+
 @router.post("/ai/classify")
-def ai_classify_endpoint(file: UploadFile = File(...)) -> JSONResponse:
+def ai_classify_endpoint(
+    file: UploadFile = File(...),
+    consent: int = Form(0),
+) -> JSONResponse:
     """Fase 3: la IA clasifica las referencias y senala elementos APA ausentes.
 
     Va en un endpoint aparte y asincrono a proposito: el informe instantaneo se
     entrega ya y la IA se consulta despues, de modo que una llamada lenta del
     proveedor no bloquea al asesor.
+
+    Exige consentimiento explicito (consent=1). Sin el se responde 428 y no se
+    contacta al proveedor: la revision por IA envia datos del documento fuera del
+    equipo y nunca debe ocurrir sin que la persona lo haya autorizado.
     """
+    if consent != 1:
+        raise HTTPException(
+            status_code=428,
+            detail="Falta el consentimiento para enviar datos a la IA.",
+        )
     settings = get_settings()
     document = _load_doc(file)
-    findings, notes, used_model = ai_reviewer.classify_references(document, settings)
+    # Contraste con reglas deterministas: se vuelven a ejecutar para detectar
+    # discrepancias (sin hallazgos deterministas pero la IA sugiere con confianza >= 0.75)
+    try:
+        rule_result = analyze(document)
+        rule_findings = rule_result.findings
+    except Exception:
+        rule_findings = []
+    findings, notes, used_model = ai_reviewer.classify_references(
+        document, settings, rule_findings=rule_findings
+    )
     return JSONResponse(
         {
             "ai_enabled": settings.ai_available,

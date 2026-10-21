@@ -1,7 +1,13 @@
 ﻿/* Ribbon estilo Word: barra de herramientas por pestañas.
-   Las acciones se delegan en Commands (edicion) y en los callbacks de app.js. */
-(function () {
+     Las acciones se delegan en Commands (edicion) y en los hooks que registra app.js. */
+import { Commands } from "./commands.js";
+import { History } from "./history.js";
+import { Icons } from "../ui/icons.js";
+
+const Ribbon = (function () {
   "use strict";
+
+  const hooks = {};
 
   // ------------------------------------------------------------- configuracion
   const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 24, 28, 36, 48];
@@ -92,6 +98,7 @@
           controls: [
 { type: "action", action: "analyze", icon: "check", label: "Verificar normas APA", big: true, primary: true },
             { type: "action", action: "ai-review", icon: "spark", label: "Revisión con IA", big: true },
+            { type: "action", action: "ai-revoke", icon: "shield", label: "Quitar consentimiento IA" },
             { type: "action", action: "fix-doc", icon: "fix", label: "Corregir documento", big: true },
             { type: "action", action: "toggle-pane", icon: "panel", label: "Panel de informe" },
             { type: "action", action: "clear-marks", icon: "paint", label: "Quitar marcas" },
@@ -135,7 +142,7 @@
 
   // ------------------------------------------------------------------ helpers
   function svg(name, size) {
-    const markup = window.Icons ? window.Icons.svg(name) : "";
+      const markup = Icons.svg(name);
     if (!markup) return "";
     return markup.replace("<svg", `<svg width="${size}" height="${size}"`);
   }
@@ -189,7 +196,7 @@
     refreshStates();
     // al cambiar de pestaña se recrean los botones: hay que volver a reflejar
     // si queda algo que deshacer o rehacer
-    if (window.History && typeof History.refresh === "function") History.refresh();
+      if (History.refresh) History.refresh();
   }
 
   function renderControl(c) {
@@ -269,9 +276,9 @@ function renderSelect(c) {
     if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "p") rebuildIndex();
   }
 
-  function rebuildIndex() {
-    if (window.App && typeof App.rebuildIndex === "function") App.rebuildIndex();
-  }
+    function rebuildIndex() {
+      if (typeof hooks.onStyleChange === "function") hooks.onStyleChange();
+    }
 
   function renderColor(c) {
     const wrap = el("div", "rcolor");
@@ -321,9 +328,9 @@ function renderSelect(c) {
     return btn;
   }
 
-  function refreshStates() {
-    if (window.Commands) Commands.refresh();
-  }
+    function refreshStates() {
+      Commands.refresh();
+    }
 
   function setZoom(value) {
     zoomValue = value;
@@ -333,5 +340,20 @@ function renderSelect(c) {
     if (label) label.textContent = value + "%";
   }
 
-  window.Ribbon = { render, setZoom, refreshStates, RIBBON, get zoom() { return zoomValue; } };
+  function setHooks(h) {
+    Object.assign(hooks, h || {});
+  }
+
+  return {
+    render,
+    setZoom,
+    refreshStates,
+    setHooks,
+    RIBBON,
+    get zoom() {
+      return zoomValue;
+    },
+  };
 })();
+
+export { Ribbon };

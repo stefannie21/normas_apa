@@ -2,9 +2,11 @@
 
 Divide el trabajo en dos: lo que el corrector puede arreglar solo y lo que
 solo se puede senalar para que la persona decida. Aqui solo se senala:
-este modulo NUNCA modifica el texto del usuario.
-*/
-(function () {
+  este modulo NUNCA modifica el texto del usuario.
+  */
+import { Fixer } from "./fixer.js";
+
+const Marker = (function () {
   "use strict";
 
   const SEV = { error: "apa-mark-error", warning: "apa-mark-warning", info: "apa-mark-info" };
@@ -203,8 +205,7 @@ este modulo NUNCA modifica el texto del usuario.
       list.find((f) => f.severity === "warning") ||
       list[0];
     const isAuto =
-      window.Fixer &&
-      uniqueRules.some((r) => window.Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
+      uniqueRules.some((r) => Fixer.CORRECTIONS.some((c) => c.rules.includes(r)));
     const label =
       sev.severity === "error" ? "Error" : sev.severity === "warning" ? "Alerta" : "Observación";
 
@@ -248,10 +249,10 @@ este modulo NUNCA modifica el texto del usuario.
     const fixBtn = pop.querySelector(".apa-pop-fixbtn");
     if (fixBtn) {
       fixBtn.addEventListener("click", () => {
-        const items = window.Fixer.CORRECTIONS.filter((c) =>
+        const items = Fixer.CORRECTIONS.filter((c) =>
           uniqueRules.some((r) => c.rules.includes(r))
         );
-        const res = window.Fixer.applySelected(items, {
+        const res = Fixer.applySelected(items, {
           sections: hooks.sections(),
         });
         close();
@@ -275,7 +276,7 @@ este modulo NUNCA modifica el texto del usuario.
     if (e.key === "Escape") close();
   });
 
-  window.Marker = {
+  return {
     apply,
     clear,
     close,
@@ -284,3 +285,5 @@ este modulo NUNCA modifica el texto del usuario.
     },
   };
 })();
+
+export { Marker };

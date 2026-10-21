@@ -43,9 +43,10 @@ def build_report(result: AnalysisResult, ai_findings: list | None = None) -> dic
         "findings": [f.to_dict() for f in findings],
     }
     if ai_findings:
+        notes = getattr(result, "ai_notes", None) or []
         payload["ai_review"] = {
             "used": True,
-            "notes": getattr(result, "ai_notes", []) or [],
+            "notes": notes,
         }
     return payload
 

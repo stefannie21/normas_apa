@@ -2,8 +2,8 @@
    la geometria de cada seccion del documento (vertical u horizontal, tamaño y margenes).
    - Divide parrafos por lineas al final de cada hoja.
    - Titulos, tablas e imagenes NO se separan (se mueven a la siguiente hoja).
-   - Respeta saltos de pagina manuales (div.page-break). */
-(function () {
+     - Respeta saltos de pagina manuales (div.page-break). */
+const Pager = (function () {
   "use strict";
 
   // Tamano por defecto cuando el .docx no aporta geometria: A4 (21 x 29.7 cm),
@@ -609,5 +609,7 @@
       .join("");
   }
 
-  window.Pager = { paginate, textOf, refit, toFlowHtml };
+  return { paginate, textOf, refit, toFlowHtml };
 })();
+
+export { Pager };

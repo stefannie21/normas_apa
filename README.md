@@ -121,21 +121,58 @@ backend/app/
     matching.py          Cruce cita <-> referencia
 frontend/
   index.html             Interfaz
+  main.js                Punto de entrada: registra vistas y arranca router/app
   styles.css
-  app.js                 Lógica de la app (carga, edición, informe, correcciones)
-  pager.js               Paginación tipo Word
-  ribbon.js              Ribbon (Inicio, Insertar, Revisar APA, Vista)
-  sidebar.js             Menú lateral y vistas
-  commands.js            Comandos de edición y estilos
-  history.js             Historial de cambios (deshacer/rehacer)
-  fixer.js               Correcciones automáticas
-  marker.js              Señalamiento de errores en el texto
-  storage.js             Guardado local (IndexedDB)
-  icons.js               Iconos
+  core/
+    dom.js               Utilidades de DOM compartidas
+    router.js            Registro y navegación entre vistas
+  ui/
+    icons.js             Iconos SVG en línea
+  views/
+    inicio.js            Panel de situación
+    tesis.js             Mis Tesis
+    correcciones.js      Vista del editor
+    reportes.js          Reportes
+    ajustes.js           Configuraciones
+  editor/
+    app.js               Lógica del editor (carga, edición, informe, correcciones)
+    pager.js             Paginación tipo Word
+    ribbon.js            Ribbon (Inicio, Insertar, Revisar APA, Vista)
+    commands.js          Comandos de edición y estilos
+    history.js           Historial de cambios (deshacer/rehacer)
+    fixer.js             Correcciones automáticas
+    marker.js            Señalamiento de errores en el texto
+    storage.js           Guardado local (IndexedDB)
+  sidebar.js             Menú lateral (plegado y despliegue)
   vendor/                mammoth.browser.min.js (docx -> HTML, local)
 tests/                   Pruebas y generadores de documentos de muestra
 inf/                     Documentación de trabajo del proyecto
 ```
+
+### Añadir una sección
+
+Cada sección es un archivo en `frontend/views/` que se importa en `main.js` y se
+registra solo. El router construye el menú con las vistas registradas, en orden
+de `order`:
+
+```js
+import { Router } from "../core/router.js";
+import { Dom } from "../core/dom.js";
+
+Router.register("reportes", {
+  title: "Reportes",
+  icon: "chart",
+  order: 40,
+  render() { return "<div>…</div>"; },
+  mount(el, api) { /* eventos */ },
+  refresh(api) { /* opcional */ },
+});
+```
+
+Para volver a dibujarla cuando cambia el estado de la app, `main.js` suscribe el
+editor al router con `App.onChange(() => Router.refresh())`; el editor no conoce
+al router. Una vista con `shell: true` no se dibuja: solo activa algo ya montado
+en la página, como el editor en `correcciones.js`.
 
 ## Endpoints principales
 

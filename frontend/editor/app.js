@@ -1,5 +1,13 @@
 /* Logica principal: carga de .docx, edicion y analisis APA. */
-(function () {
+import { Pager } from "./pager.js";
+import { Commands } from "./commands.js";
+import { Marker } from "./marker.js";
+import { Fixer } from "./fixer.js";
+import { History } from "./history.js";
+import { SessionStore } from "./storage.js";
+import { Ribbon } from "./ribbon.js";
+
+const App = (function () {
   "use strict";
   const SEVERITY_ICON = { error: "!", warning: "!", info: "i" };
 
@@ -36,6 +44,7 @@
   Ribbon.render(document.getElementById("ribbon-tabs"), document.getElementById("ribbon-panels"), {
     analyze: runAnalysis,
     "ai-review": runAiReview,
+    "ai-revoke": revokeAiConsent,
     "fix-doc": openFixModal,
     "toggle-pane": () => (reportPane.hidden ? openPane() : (reportPane.hidden = true)),
     "clear-marks": clearMarks,
@@ -269,20 +278,130 @@
   let lastFindings = [];
   let lastSummary = null;
 
+  // El consentimiento vive en sessionStorage: vale para esta sesion de trabajo y
+  // desaparece al cerrar la pestana. Nunca en localStorage, para no dejar un
+  // permiso permanente que envie datos del documento fuera del equipo.
+  const AI_CONSENT_KEY = "apa.ai.consent";
+
+  function hasAiConsent() {
+    try {
+      return sessionStorage.getItem(AI_CONSENT_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function grantAiConsent() {
+    try {
+      sessionStorage.setItem(AI_CONSENT_KEY, "1");
+    } catch (e) {
+      /* modo privado: el consentimiento dura solo la sesion en memoria */
+    }
+  }
+
+  function revokeAiConsent() {
+    try {
+      sessionStorage.removeItem(AI_CONSENT_KEY);
+    } catch (e) {
+      /* sin persistencia */
+    }
+    showToast("Consentimiento de IA revocado: no se enviarán más datos.", "info");
+  }
+
+  // Dialogo de vista previa + consentimiento. Todo lo que muestra viene de
+  // /api/ai/preview, que no contacta con el proveedor: solo describe el alcance.
+  function askAiConsent(preview) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "ai-consent-overlay";
+      const campos = (preview.fields || []).map((f) => `<code>${escapeHtml(f)}</code>`).join(" ");
+      overlay.innerHTML = `
+        <div class="ai-consent" role="dialog" aria-modal="true" aria-labelledby="ai-consent-t">
+          <h2 id="ai-consent-t">Revisión con IA: datos que se enviarán</h2>
+          <p>La revisión con IA envía <strong>solo las referencias y citas detectadas</strong>,
+             nunca el texto completo de la tesis.</p>
+          <ul class="ai-consent-list">
+            <li><b>${preview.references || 0}</b> referencias</li>
+            <li><b>${preview.citations || 0}</b> citas</li>
+            <li>Máximo <b>${preview.chars_max || 0}</b> caracteres</li>
+            <li>Proveedor: <b>${escapeHtml(preview.provider || "")}</b> · modelo <b>${escapeHtml(preview.model || "")}</b></li>
+          </ul>
+          <p class="ai-consent-fields">Campos: ${campos}</p>
+          <p class="ai-consent-note">El consentimiento vale para esta sesión. Puedes revocarlo
+             desde la cinta (Revisar APA → Quitar consentimiento IA).</p>
+          <div class="ai-consent-actions">
+            <button type="button" data-act="no">Cancelar</button>
+            <button type="button" class="primary" data-act="si">Autorizar y revisar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const cerrar = (valor) => {
+        overlay.remove();
+        document.removeEventListener("keydown", onKey);
+        resolve(valor);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") cerrar(false);
+      };
+      document.addEventListener("keydown", onKey);
+      overlay.querySelector('[data-act="no"]').addEventListener("click", () => cerrar(false));
+      overlay.querySelector('[data-act="si"]').addEventListener("click", () => cerrar(true));
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) cerrar(false);
+      });
+    });
+  }
+
   async function runAiReview() {
     if (!currentFile) {
       showToast("Primero abre un documento .docx", "error");
       return;
     }
+    // 1) Consentimiento: si no lo hay, se muestra la vista previa y se pide.
+    if (!hasAiConsent()) {
+      statusMsg.textContent = "Preparando vista previa de IA...";
+      let preview;
+      try {
+        const pv = new FormData();
+        pv.append("file", currentFile, currentFile.name);
+        const res = await fetch("/api/ai/preview", { method: "POST", body: pv });
+        preview = await res.json();
+        if (!res.ok) throw new Error(preview.detail || "Error " + res.status);
+      } catch (err) {
+        statusMsg.textContent = "";
+        showToast("No se pudo preparar la vista previa de IA: " + err.message, "error");
+        return;
+      }
+      statusMsg.textContent = "";
+      if (!preview.ai_enabled) {
+        showToast("La revisión con IA no está habilitada (falta la clave del proveedor).", "error");
+        return;
+      }
+      const autorizado = await askAiConsent(preview);
+      if (!autorizado) {
+        showToast("Revisión con IA cancelada. No se envió nada.", "info");
+        return;
+      }
+      grantAiConsent();
+    }
+
+    // 2) Revision: solo ahora se contacta con el proveedor.
     statusMsg.textContent = "Consultando a la IA...";
     const data = new FormData();
     data.append("file", currentFile, currentFile.name);
+    data.append("consent", "1");
     try {
       const res = await fetch("/api/ai/classify", { method: "POST", body: data });
       const payload = await res.json();
+      if (res.status === 428) {
+        revokeAiConsent();
+        statusMsg.textContent = "";
+        showToast("El servidor exige consentimiento; vuelve a intentarlo.", "error");
+        return;
+      }
       if (!res.ok) throw new Error(payload.detail || "Error " + res.status);
       if (!payload.ai_enabled) {
-        showToast("La revisión con IA no está habilitada (falta AI_ENABLED o la clave).", "error");
+        showToast("La revisión con IA no está habilitada (falta la clave del proveedor).", "error");
         statusMsg.textContent = "";
         return;
       }
@@ -500,7 +619,7 @@
     markInDocument();
     // el panel de Inicio muestra estos mismos numeros: se le avisa para que no
     // se quede con los valores anteriores
-    if (window.Sidebar && typeof Sidebar.refresh === "function") Sidebar.refresh();
+    notifyChange();
   }
 
   /* ---------- Senalar los problemas dentro del texto ---------- */
@@ -568,13 +687,11 @@
       .map((f) => {
         const extra = f.extra || {};
         const isAi = String(f.rule_id || "").startsWith("AI-");
+        const model = extra.ai_model ? ` · Modelo: ${escapeHtml(extra.ai_model)}` : "";
+        const confTxt = extra.ai_confidence != null ? ` · Confianza: ${Math.round(extra.ai_confidence * 100)}%` : "";
         const badge = isAi
-          ? `<span class="ai-badge" title="Sugerencia de la IA: no se aplica automaticamente">IA</span>`
+          ? `<span class="ai-badge" title="Sugerencia de la IA: no se aplica automáticamente. Solo revisa citas/referencias.${model}${confTxt}">IA</span>`
           : "";
-        const conf =
-          isAi && extra.ai_confidence != null
-            ? `<span class="ai-conf">confianza ${Math.round(extra.ai_confidence * 100)}%</span>`
-            : "";
         const missing =
           isAi && extra.ai_missing && extra.ai_missing.length
             ? `<p class="finding-missing">Falta: ${escapeHtml(extra.ai_missing.join(" · "))}</p>`
@@ -931,10 +1048,24 @@
     toastTimer = setTimeout(() => (toast.hidden = true), 3200);
   }
 
-  /* ---------- API minima para el ribbon ---------- */
+  /* ---------- API minima para el ribbon y las vistas ---------- */
   // el selector de estilos puede convertir <p> en <h1>, lo que invalida el
   // indice generado; se expone esta funcion para rehacerlo
-  window.App = {
+  const listeners = [];
+  function notifyChange() {
+    listeners.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+        /* una vista rota no debe detener al editor */
+      }
+    });
+  }
+
+  const api = {
+    onChange(fn) {
+      if (typeof fn === "function") listeners.push(fn);
+    },
     rebuildIndex() {
       // Se quitan TODAS las partes del indice, no solo la primera: si el
       // documento lo partio entre varias hojas, con querySelector se dejaba la
@@ -1371,8 +1502,8 @@
     },
   });
   History.onChange(() => {
-    if (window.Commands) Commands.refresh();
-    if (window.History) History.refresh();
+    Commands.refresh();
+    History.refresh();
   });
 
   // aviso al cerrar con cambios sin guardar
@@ -1382,17 +1513,21 @@
     e.returnValue = "";
   });
 
-  restoreSession();
+  // el ribbon no conoce el editor: se le inyecta el callback del indice
+  Ribbon.setHooks({ onStyleChange: () => api.rebuildIndex() });
 
-  // el menú lateral toma su API de window.App
-  if (window.Sidebar) Sidebar.init(window.App);
+  restoreSession();
 
   try {
     if (localStorage.getItem("apa.ribbon.collapsed") === "1") setRibbonCollapsed(true);
   } catch (e) {
     /* sin persistencia */
   }
+
+  return api;
 })();
+
+export { App };
 
 
 

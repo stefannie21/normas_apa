@@ -2,9 +2,9 @@
 
 Regla del proyecto: la IA no escribe en el documento y aqui tampoco se
 corrige nada semantico (anios, autores, contenido). Solo formato ypunctuation
-que se pueden aplicar con certeza y deshacer.
-*/
-(function () {
+  que se pueden aplicar con certeza y deshacer.
+  */
+const Fixer = (function () {
   "use strict";
 
   const REFS_TITLE_RE = /^(referencias|reference|bibliograf[ií]a)/i;
@@ -390,5 +390,8 @@ apply() {
     return { total, done };
   }
 
-  window.Fixer = { CORRECTIONS, available, preview, applySelected };
-})();
+    return { CORRECTIONS, available, preview, applySelected };
+  })();
+
+export { Fixer };
+

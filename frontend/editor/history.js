@@ -12,7 +12,7 @@
    Aqui se guarda una instantanea completa de #page con cada cambio. Un
    MutationObserver la toma sola, de modo que cualquier operacion de la
    aplicacion queda deshacible sin tener que acordarse de registrarla. */
-(function () {
+const History = (function () {
   "use strict";
 
   var MAX_STEPS = 60;     // instantaneas conservadas hacia atras
@@ -264,7 +264,7 @@
     observe();
   }
 
-  window.History = {
+  return {
     init: init,
     undo: undo,
     redo: redo,
@@ -282,8 +282,10 @@
     canUndo: function () {
       return past.length > 0;
     },
-    canRedo: function () {
-      return future.length > 0;
-    },
-  };
-})();
+      canRedo: function () {
+        return future.length > 0;
+      },
+    };
+  })();
+
+export { History };

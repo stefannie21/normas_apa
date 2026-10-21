@@ -1,8 +1,8 @@
 /* Guardado local de la sesion (IndexedDB).
    Permite conservar el documento original y las ediciones hechas en la web
    entre recargas, sin depender del servidor y sin el limite de 5 MB de
-   localStorage (los .docx con imagenes lo superan con facilidad). */
-(function () {
+     localStorage (los .docx con imagenes lo superan con facilidad). */
+const SessionStore = (function () {
   "use strict";
 
   const DB_NAME = "apa-studio";
@@ -58,5 +58,7 @@
     return tx("readwrite", (store) => store.delete(KEY));
   }
 
-  window.SessionStore = { save, load, clear };
+  return { save, load, clear };
 })();
+
+export { SessionStore };

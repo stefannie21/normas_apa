@@ -12,6 +12,9 @@ class AnalysisResult:
     filename: str
     findings: list[Finding] = field(default_factory=list)
     summary: dict = field(default_factory=dict)
+    # avisos de la capa IA (modelo usado, notas). Se rellena cuando se fusiona la
+    # revision por IA; el informe los usa para la seccion de auditoria.
+    ai_notes: list[str] = field(default_factory=list)
 
 
 def analyze(document: ParsedDocument) -> AnalysisResult:
