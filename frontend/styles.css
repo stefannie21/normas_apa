@@ -119,10 +119,10 @@ body {
 .sb-brand-txt small { font-size: .68rem; color: var(--sb-dim); margin-top: 1px; }
 
 /* el padding inferior reserva el hueco del boton de plegado */
-.sb-nav { display: flex; flex-direction: column; gap: 3px; padding: 4px 10px 46px; }
+.sb-nav { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 46px; }
 .sb-item {
   display: flex; align-items: center; gap: 11px;
-  width: 100%; padding: 9px 12px;
+  width: 100%; padding: 10px 12px;
   border: 0; border-radius: 8px;
   background: transparent; color: var(--sb-text);
   font: inherit; font-size: .85rem; text-align: left; cursor: pointer;
@@ -583,24 +583,6 @@ body.show-ruler .canvas::before {
   width: var(--landscape-w, 1122px) !important;
   min-height: var(--landscape-h, 794px) !important;
   max-width: none !important;
-}
-/* Etiqueta de orientacion en la esquina de cada hoja: deja claro cuales son
-   horizontales y cuales verticales. La horizontal se destaca; la vertical es
-   discreta porque es lo normal. */
-.sheet::after {
-  content: var(--orient-label, "");
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  font-size: 9px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: #b6bec9;
-  pointer-events: none;
-}
-.sheet.landscape::after {
-  color: #1f5c9e;
-  font-weight: 700;
 }
 
 .sheet {

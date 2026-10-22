@@ -433,9 +433,6 @@ const Pager = (function () {
     // pasa el ancho y alto reales de la seccion para que no sea un valor fijo
     sheet.style.setProperty("--landscape-w", g.width + "px");
     sheet.style.setProperty("--landscape-h", g.height + "px");
-    // etiqueta de orientacion que se pinta en la esquina de la hoja.
-    // Va entrecomillada: en `content` un texto sin comillas no es valido.
-    sheet.style.setProperty("--orient-label", g.landscape ? '"Horizontal"' : '"Vertical"');
     sheet.style.width = g.width + "px";
     sheet.style.minHeight = g.height + "px";
     sheet.style.paddingTop = g.padTop + "px";
