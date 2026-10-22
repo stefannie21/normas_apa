@@ -70,6 +70,14 @@ def check_citas() -> None:
     assert len(bib.references) >= 7, f"Se esperaban 7 referencias, hay {len(bib.references)}"
     assert len(bib.citations) >= 5, f"Se esperaban varias citas, hay {len(bib.citations)}"
 
+    # Conteo de autores: 'Perez, J., y Gomez, M.' son DOS autores, no tres. Si
+    # las iniciales se toman como apellidos, se acaba exigiendo 'et al.' en una
+    # obra de dos autores y se pierde la cita correcta.
+    conteo = {r.surnames[0]: r.author_count for r in bib.references if r.surnames}
+    assert conteo.get("Perez") == 2, f"Perez y Gomez son dos autores: {conteo.get('Perez')}"
+    assert conteo.get("Ramos") == 3, f"Ramos, Soto y Vega son tres autores: {conteo.get('Ramos')}"
+    assert "CIT-008" in rule_ids, "Debe marcar 'et al.' en una obra de dos autores"
+
     # cita sin referencia debe(listarse
     missing_refs = bib.missing_references()
     assert any("Delgado" in " ".join(c.surnames) for c in missing_refs), \

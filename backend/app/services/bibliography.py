@@ -234,7 +234,9 @@ def _split_authors(block: str) -> list[str]:
             # despues de un apellido pueden venir iniciales sueltas: 'Ramos, L.'
             initials: list[str] = []
             j = i + 1
-            while j < len(tokens) and not _looks_like_surname(tokens[j]):
+            while j < len(tokens) and (
+                not _looks_like_surname(tokens[j]) or _starts_with_initial(tokens[j])
+            ):
                 initials.append(tokens[j])
                 j += 1
             authors.append(token + (", " + ", ".join(initials) if initials else ""))
@@ -268,6 +270,11 @@ def _is_spain_format_pair(first: str, second: str) -> bool:
     return all(len(w) > 2 for w in a)
 
 
+def _starts_with_initial(token: str) -> bool:
+    """'L. A.', 'S. de los A.' o 'A. del J.' empiezan por una inicial."""
+    return bool(re.match(r"^[A-ZÁÉÍÓÚÑ]\.", (token or "").strip()))
+
+
 def _looks_like_surname(token: str) -> bool:
     """Un apellido empieza por mayuscula y no es solo una inicial."""
     t = token.strip()
@@ -275,6 +282,11 @@ def _looks_like_surname(token: str) -> bool:
         return False
     if re.fullmatch(r"[A-ZÁÉÍÓÚÑ]\.?", t):
         return False  # es una inicial
+    # 'L. A.' o 'J. J.' son las iniciales del autor anterior, no un apellido:
+    # contarlas como autor hacia que 'Clark, L. A., y Watson, D.' pareciera una
+    # obra de tres autores y se exigiera 'et al.' en una cita de dos.
+    if re.fullmatch(r"(?:[A-ZÁÉÍÓÚÑ]\.?\s*)+", t):
+        return False
     return bool(re.match(r"[A-ZÁÉÍÓÚÑ]", t))
 
 
