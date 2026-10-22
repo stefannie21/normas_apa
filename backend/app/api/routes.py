@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
-from backend.app.services import ai_reviewer, report
+from backend.app.services import ai_filter, ai_reviewer, report
 from backend.app.services.analyzer import analyze
 from backend.app.services.docx_parser import image_sizes, parse_docx
 from backend.app.services.docx_writer import apply_corrections
@@ -491,6 +491,19 @@ def ai_classify_endpoint(
     findings, notes, used_model = ai_reviewer.classify_references(
         document, settings, rule_findings=rule_findings
     )
+    # Filtro IA de falsos positivos + sugerencias de correccion (opt-in).
+    filter_result = ai_filter.filter_findings(document, rule_findings)
+    dismissed = [f.to_dict() for f in filter_result.dismissed]
+    for f in findings:
+        pass
+    # Anota la sugerencia de la IA en los hallazgos que se mantienen.
+    for f in rule_findings:
+        if "ai_suggested_fix" in (f.extra or {}):
+            for out in findings:
+                if out.rule_id == f.rule_id and out.paragraph_index == f.paragraph_index:
+                    out.extra = dict(out.extra or {})
+                    out.extra["ai_suggested_fix"] = f.extra["ai_suggested_fix"]
+    all_notes = list(notes) + list(filter_result.notes)
     return JSONResponse(
         {
             "ai_enabled": settings.ai_available,
@@ -498,7 +511,9 @@ def ai_classify_endpoint(
             "model": used_model or settings.resolved_model,
             "cascade": settings.model_cascade,
             "findings": [f.to_dict() for f in findings],
-            "notes": notes,
+            "dismissed": dismissed,
+            "dismissed_count": len(dismissed),
+            "notes": all_notes,
         }
     )
 
