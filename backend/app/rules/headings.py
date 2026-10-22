@@ -273,6 +273,11 @@ class HeadingStyleRule(Rule):
         findings: list[Finding] = []
         paragraphs = document.body_paragraphs
         for index, p in enumerate(paragraphs):
+            # Excepcion de portada/caratula: los nombres de instituciones,
+            # universidades, facultades y titulos de la investigacion en la
+            # primera pagina se mantienen en estilo Normal (no entran al Indice).
+            if getattr(p, "estimated_page", 1) == 1:
+                continue
             if not self._is_candidate(p, document, index, paragraphs):
                 continue
             signals = self._signals(p, document)
