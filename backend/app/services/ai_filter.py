@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 
 from backend.app.config import get_settings
@@ -31,15 +32,39 @@ hallazgos generados por un motor de reglas deterministicas sobre una tesis.
 Para cada hallazgo debes decidir si es un PROBLEMA REAL (keep) o un FALSO
 POSITIVO (dismiss), y proponer una correccion concreta cuando sea real.
 
-Reglas de decision:
-- Descarta (dismiss) solo cuando el hallazgo no aplica realmente al contexto:
-  portada/carátula, tablas, autores institucionales/corporativos, citas
-  secundarias ("como se citó en"), nombres compuestos en español, años con
-  errata menor, etc.
-- Mantén (keep) cuando el problema es genuino y requiere correccion.
-- Para cada hallazgo mantenido, propón "suggested_fix": el texto o cambio
-  concreto que el autor debe aplicar (corto, accionable).
-- Para los descartados, "reason": motivo breve de por qué es falso positivo.
+REGLA DE ORO: Si el hallazgo ocurre en la primera página (portada/carátula) y
+se refiere a títulos sin estilo o tamaños de fuente grandes (14/16/18 pt o
+superiores), clasifícalo como "dismiss".
+
+Criterios por prefijo de regla:
+- HEAD (títulos/jerarquías): ignora párrafos centrados, en negrita o con
+  tamaño mayor si están en la portada, dedicatorias o índices. En el cuerpo
+  (Capítulo I en adelante) sí aplican.
+- FORMAT (fuentes/tamaños): las tolerancias de tamaño no aplican a los títulos
+  principales de la carátula ni a subtítulos institucionales; en el cuerpo se
+  exige 11/12 pt.
+- REF (referencias): los autores institucionales/corporativos (SUNAT, OECD,
+  Municipalidad, El Comercio, etc.) son válidos y no requieren "Apellido,
+  Inicial.".
+- CRUCE (citas/referencias): no marcar "sin entrada" si los apellidos del texto
+  coinciden con el inicio del encabezado de la referencia (apellidos compuestos
+  en español, partículas "de los/del/la").
+
+Ejemplo 1 (falso positivo - portada):
+- Hallazgo: Título sin estilo asignado en "Universidad Nacional Mayor de San Marcos". Pagina: 1. Seccion: Portada.
+- Clasificación: {"index": 0, "verdict": "dismiss", "reason": "Elemento de la carátula institucional, se mantiene en estilo Normal.", "suggested_fix": ""}
+
+Ejemplo 2 (falso positivo - fuente institucional):
+- Hallazgo: Tamaño de fuente fuera de rango (16 pt). Pagina: 1. Seccion: Portada.
+- Clasificación: {"index": 1, "verdict": "dismiss", "reason": "Tamaño institucional de la carátula, no aplica el rango del cuerpo.", "suggested_fix": ""}
+
+Ejemplo 3 (error real - cuerpo):
+- Hallazgo: Título sin estilo asignado en "1.1. Situación problemática". Pagina: 4. Seccion: Capítulo I.
+- Clasificación: {"index": 2, "verdict": "keep", "reason": "", "suggested_fix": "Aplicar estilo de Título 2."}
+
+Ejemplo 4 (error real - cita):
+- Hallazgo: Cita sin referencia "García (2020)". Pagina: 12. Seccion: Capítulo II.
+- Clasificación: {"index": 3, "verdict": "keep", "reason": "", "suggested_fix": "Agregar la entrada correspondiente en la lista de Referencias."}
 
 Responde EXCLUSIVAMENTE con un array JSON, sin texto adicional:
 [
@@ -59,13 +84,26 @@ class FilterResult:
 def _build_user_content(findings: list[Finding]) -> str:
     items = []
     for i, f in enumerate(findings):
+        extra = f.extra or {}
+        # Metadatos de contexto: página, sección y si está en tabla, para que la
+        # IA no trate igual a todo el documento (portada vs. cuerpo vs. anexos).
+        page = None
+        loc = f.location or ""
+        m = re.search(r"P[aá]gina(?:s)?\s*(\d+)", loc, re.IGNORECASE)
+        if m:
+            page = int(m.group(1))
+        if page is None and f.paragraph_index is not None:
+            page = None
         items.append(
             {
                 "index": i,
                 "rule_id": f.rule_id,
                 "severity": f.severity.value,
                 "message": f.message[:240],
-                "location": f.location[:120],
+                "page": page,
+                "section": extra.get("section", ""),
+                "in_table": bool(extra.get("in_table", False)),
+                "location": loc[:120],
                 "excerpt": (f.excerpt or "")[:120],
                 "paragraph": f.paragraph_index,
             }
