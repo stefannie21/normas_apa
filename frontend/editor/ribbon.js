@@ -133,6 +133,7 @@ const Ribbon = (function () {
           label: "Mostrar",
           controls: [
             { type: "action", action: "toggle-pane", icon: "panel", label: "Ver informe" },
+            { type: "action", action: "orientacion", icon: "pageBreak", label: "Orientación de páginas" },
             { type: "action", action: "toggle-ruler", icon: "ruler", label: "Regla" },
           ],
         },

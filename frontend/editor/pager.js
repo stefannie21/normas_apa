@@ -423,12 +423,19 @@ const Pager = (function () {
   function makeSheet(root, g, sectionIndex) {
     const sheet = document.createElement("div");
     sheet.className = "sheet" + (g.landscape ? " landscape" : "");
+    // orientacion de esta hoja: horizontal (landscape) o vertical (portrait).
+    // Se guarda como atributo para poder consultarla desde el estado y el
+    // resumen de orientacion.
+    sheet.dataset.orient = g.landscape ? "landscape" : "portrait";
     sheet.dataset.section = String(sectionIndex);
     sheet.style.setProperty("--content-h", g.contentH + "px");
     // el CSS fuerza el tamano de las hojas horizontales con !important: se le
     // pasa el ancho y alto reales de la seccion para que no sea un valor fijo
     sheet.style.setProperty("--landscape-w", g.width + "px");
     sheet.style.setProperty("--landscape-h", g.height + "px");
+    // etiqueta de orientacion que se pinta en la esquina de la hoja.
+    // Va entrecomillada: en `content` un texto sin comillas no es valido.
+    sheet.style.setProperty("--orient-label", g.landscape ? '"Horizontal"' : '"Vertical"');
     sheet.style.width = g.width + "px";
     sheet.style.minHeight = g.height + "px";
     sheet.style.paddingTop = g.padTop + "px";

@@ -584,16 +584,23 @@ body.show-ruler .canvas::before {
   min-height: var(--landscape-h, 794px) !important;
   max-width: none !important;
 }
-.sheet.landscape::after {
-  content: "Hoja horizontal";
+/* Etiqueta de orientacion en la esquina de cada hoja: deja claro cuales son
+   horizontales y cuales verticales. La horizontal se destaca; la vertical es
+   discreta porque es lo normal. */
+.sheet::after {
+  content: var(--orient-label, "");
   position: absolute;
   top: 8px;
   left: 10px;
   font-size: 9px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: rgba(74, 131, 181, .7);
+  color: #b6bec9;
   pointer-events: none;
+}
+.sheet.landscape::after {
+  color: #1f5c9e;
+  font-weight: 700;
 }
 
 .sheet {
@@ -1086,6 +1093,25 @@ body.reading #page { cursor: default; }
 }
 .modal-count { font-size: .8rem; color: var(--muted); }
 .modal-actions { display: flex; gap: 8px; }
+
+/* ---------- Resumen de orientacion de las paginas ---------- */
+.orient-block {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.orient-head { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
+.orient-head b { color: var(--ink); }
+.orient-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
+.orient-dot.h { background: var(--accent); }
+.orient-dot.v { background: #b6bec9; }
+.orient-count { margin-left: auto; font-size: .76rem; color: var(--muted); }
+.orient-pages {
+  margin: 8px 0 0; font-size: .84rem; line-height: 1.5;
+  font-family: Consolas, monospace; color: var(--ink);
+  word-break: break-word;
+}
 .mbtn {
   border: 1px solid var(--line-strong);
   background: #fff;

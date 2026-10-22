@@ -55,6 +55,7 @@ const App = (function () {
     "ai-revoke": revokeAiConsent,
     "fix-doc": openFixModal,
     "toggle-pane": () => togglePane(),
+    orientacion: () => openOrientModal(),
     "clear-marks": clearMarks,
     "page-break": () => {
       insertHtml('<div class="page-break"></div>');
@@ -1158,8 +1159,50 @@ const App = (function () {
   /* ---------- Pagina visible ---------- */
   let totalPages = 0;
   let currentPage = 1;
+
+  // Orientacion de una hoja: el paginador deja el atributo en cada .sheet.
+  function orientacionHoja(n) {
+    const s = page.querySelectorAll(".sheet")[n - 1];
+    if (!s) return "";
+    return s.dataset.orient === "landscape" ? "Horizontal" : "Vertical";
+  }
+
+  // Paginas horizontales y verticales, en rangos ("44-46, 52").
+  function resumenOrientacion() {
+    const sheets = Array.from(page.querySelectorAll(".sheet"));
+    const horiz = [];
+    const vert = [];
+    sheets.forEach((s, i) => {
+      (s.dataset.orient === "landscape" ? horiz : vert).push(i + 1);
+    });
+    const aRangos = (paginas) => {
+      const out = [];
+      let ini = null;
+      let prev = null;
+      for (const n of paginas) {
+        if (ini === null) {
+          ini = n;
+          prev = n;
+          continue;
+        }
+        if (n === prev + 1) {
+          prev = n;
+          continue;
+        }
+        out.push(ini === prev ? String(ini) : ini + "-" + prev);
+        ini = n;
+        prev = n;
+      }
+      if (ini !== null) out.push(ini === prev ? String(ini) : ini + "-" + prev);
+      return out;
+    };
+    return { horiz: aRangos(horiz), vert: aRangos(vert), total: sheets.length };
+  }
+
   function updatePageLabel() {
-    statusPages.textContent = "Página " + currentPage + " de " + Math.max(totalPages, 1);
+    const orient = orientacionHoja(currentPage);
+    statusPages.textContent =
+      "Página " + currentPage + " de " + Math.max(totalPages, 1) + (orient ? " · " + orient : "");
   }
   function trackCurrentPage() {
     const sheets = page.querySelectorAll(".sheet");
@@ -1531,6 +1574,61 @@ const App = (function () {
     setRibbonCollapsed(!ribbonNav.classList.contains("is-collapsed"))
   );
 
+  /* ---------- Orientacion de las paginas ---------- */
+  const orientModal = document.getElementById("orient-modal");
+  const orientBody = document.getElementById("orient-body");
+  const orientSub = document.getElementById("orient-modal-sub");
+  const orientCount = document.getElementById("orient-count");
+
+  function closeOrientModal() {
+    if (orientModal) orientModal.hidden = true;
+  }
+
+  function openOrientModal() {
+    if (!orientModal) return;
+    const r = resumenOrientacion();
+    if (!r.total) {
+      showToast("Abre un documento primero", "error");
+      return;
+    }
+    orientSub.textContent =
+      "El documento tiene " + r.total + " páginas. Estas son las horizontales y las verticales.";
+    const bloque = (titulo, color, paginas, total) => `
+      <div class="orient-block">
+        <div class="orient-head">
+          <span class="orient-dot ${color}"></span>
+          <b>${titulo}</b>
+          <span class="orient-count">${total} de ${r.total} páginas</span>
+        </div>
+        <p class="orient-pages">${paginas.length ? paginas.join(", ") : "—"}</p>
+      </div>`;
+    orientBody.innerHTML =
+      bloque("Páginas horizontales (landscape)", "h", r.horiz, r.horiz.length ? cuenta(r.horiz) : 0) +
+      bloque("Páginas verticales (portrait)", "v", r.vert, r.vert.length ? cuenta(r.vert) : 0);
+    orientCount.textContent = "";
+    orientModal.hidden = false;
+  }
+
+  // numero de paginas de un listado de rangos ("44-46, 52" -> 5)
+  function cuenta(rangos) {
+    let n = 0;
+    for (const rg of rangos) {
+      const partes = rg.split("-");
+      n += partes.length === 2 ? Number(partes[1]) - Number(partes[0]) + 1 : 1;
+    }
+    return n;
+  }
+
+  if (orientModal) {
+    orientModal.addEventListener("click", (e) => {
+      if (e.target === orientModal) closeOrientModal();
+    });
+    const oc = document.getElementById("orient-modal-close");
+    const oCancel = document.getElementById("orient-cancel");
+    if (oc) oc.addEventListener("click", closeOrientModal);
+    if (oCancel) oCancel.addEventListener("click", closeOrientModal);
+  }
+
   /* ---------- Corregir documento ---------- */
   const fixModal = document.getElementById("fix-modal");
   const fixList = document.getElementById("fix-list");
@@ -1685,6 +1783,7 @@ const App = (function () {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !fixModal.hidden) closeFixModal();
+    if (e.key === "Escape" && orientModal && !orientModal.hidden) closeOrientModal();
   });
 
   // el marcado del documento usa estos enlaces con la app
