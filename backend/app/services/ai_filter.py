@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass, field
 
 from backend.app.config import get_settings
-from backend.app.rules.base import Category, Finding, Severity
+from backend.app.rules.base import Finding
 from backend.app.services import ai_reviewer
 from backend.app.services.docx_parser import ParsedDocument
 
@@ -150,11 +150,6 @@ def filter_findings(
     for start in range(0, len(findings), batch_size):
         batch = findings[start : start + batch_size]
         content = _build_user_content(batch)
-        items, used_model, error = ai_reviewer._request_with_cascade(settings, content)
-        # _request_with_cascade usa SYSTEM_PROMPT del ai_reviewer; reenviamos
-        # con nuestro prompt sobrescribiendo mediante un wrapper manual.
-        # Como _request_with_cascade no permite system prompt custom, hacemos
-        # la llamada directa aqui:
         items, used_model, error = _call_with_prompt(settings, content)
         if error is not None:
             logger.warning("Filtro IA fallo en lote %d: %s", start, error)

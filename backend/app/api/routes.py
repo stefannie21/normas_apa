@@ -494,15 +494,6 @@ def ai_classify_endpoint(
     # Filtro IA de falsos positivos + sugerencias de correccion (opt-in).
     filter_result = ai_filter.filter_findings(document, rule_findings)
     dismissed = [f.to_dict() for f in filter_result.dismissed]
-    for f in findings:
-        pass
-    # Anota la sugerencia de la IA en los hallazgos que se mantienen.
-    for f in rule_findings:
-        if "ai_suggested_fix" in (f.extra or {}):
-            for out in findings:
-                if out.rule_id == f.rule_id and out.paragraph_index == f.paragraph_index:
-                    out.extra = dict(out.extra or {})
-                    out.extra["ai_suggested_fix"] = f.extra["ai_suggested_fix"]
     all_notes = list(notes) + list(filter_result.notes)
     return JSONResponse(
         {
