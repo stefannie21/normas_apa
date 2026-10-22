@@ -18,7 +18,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from backend.app.config import get_settings
+from backend.app.config import BASE_DIR, get_settings
 from backend.app.rules.base import Finding
 from backend.app.services import ai_reviewer
 from backend.app.services.docx_parser import ParsedDocument
@@ -72,6 +72,73 @@ Responde EXCLUSIVAMENTE con un array JSON, sin texto adicional:
   {"index": 1, "verdict": "dismiss", "reason": "Es el titulo de la portada.", "suggested_fix": ""}
 ]
 """
+
+
+
+# --- Feedback loop: registro de falsos positivos descartados por la IA ---
+DISMISS_LOG = BASE_DIR / "data" / "ai_dismissed_log.jsonl"
+
+
+def _load_recent_dismissed(limit: int = 5) -> list[dict]:
+    """Carga los ultimos casos descartados para usarlos como ejemplos dinamicos."""
+    if not DISMISS_LOG.exists():
+        return []
+    out: list[dict] = []
+    try:
+        lines = DISMISS_LOG.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+    for line in lines[-limit:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            continue
+    return out
+
+
+def _log_dismissed(dismissed: list[Finding]) -> None:
+    """Persiste los descartes para el ciclo de retroalimentacion."""
+    if not dismissed:
+        return
+    try:
+        DISMISS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with DISMISS_LOG.open("a", encoding="utf-8") as fh:
+            for f in dismissed:
+                entry = {
+                    "rule_id": f.rule_id,
+                    "message": (f.message or "")[:160],
+                    "page": None,
+                    "reason": (f.extra or {}).get("ai_dismiss_reason", ""),
+                }
+                loc = f.location or ""
+                import re as _re
+                m = _re.search(r"P[aá]gina(?:s)?\s*(\d+)", loc, _re.IGNORECASE)
+                if m:
+                    entry["page"] = int(m.group(1))
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        logger.warning("No se pudo guardar el log de descartes IA: %s", exc)
+
+
+def _build_system_prompt() -> str:
+    """System prompt base + ejemplos aprendidos del historial (feedback loop)."""
+    base = SYSTEM_PROMPT
+    recent = _load_recent_dismissed(5)
+    if not recent:
+        return base
+    extra = "\n\nEjemplos adicionales aprendidos del historial de descartes:\n"
+    for i, e in enumerate(recent, start=100):
+        extra += (
+            f'- Hallazgo: {e.get("rule_id")} - {e.get("message")} '
+            f'(Pagina: {e.get("page")}).\n'
+            f'  Clasificacion: {{"index": {i}, "verdict": "dismiss", '
+            f'"reason": "{e.get("reason", "")}", "suggested_fix": ""}}\n'
+        )
+    return base + extra
+
 
 
 @dataclass
@@ -166,6 +233,7 @@ def filter_findings(
             f"Filtro IA ejecutado con: {', '.join(sorted(set(used_models)))}."
         )
     # Si por algun motivo no se clasifico todo, conservar los faltantes.
+    _log_dismissed(result.dismissed)
     classified = len(result.kept) + len(result.dismissed)
     if classified < len(findings):
         missing = findings[classified:]
@@ -184,7 +252,7 @@ def _call_with_prompt(settings, user_content: str):
             url = f"{settings.base_url}/models/{model}:generateContent"
             headers = {"x-goog-api-key": settings.resolved_key, "Content-Type": "application/json"}
             body = {
-                "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "system_instruction": {"parts": [{"text": _build_system_prompt()}]},
                 "contents": [{"parts": [{"text": user_content}]}],
                 "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"},
             }
@@ -194,7 +262,7 @@ def _call_with_prompt(settings, user_content: str):
             body = {
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": _build_system_prompt()},
                     {"role": "user", "content": user_content},
                 ],
                 "temperature": 0.1,
