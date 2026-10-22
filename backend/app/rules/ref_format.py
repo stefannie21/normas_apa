@@ -7,7 +7,11 @@ from __future__ import annotations
 import re
 
 from backend.app.rules.base import Category, Finding, Rule, Severity
-from backend.app.services.bibliography import ReferenceRecord
+from backend.app.services.bibliography import (
+    ReferenceRecord,
+    author_heading,
+    is_corporate_author,
+)
 from backend.app.services.docx_parser import ParsedDocument
 
 # Tipos cuya referencia lleva el TITULO en cursiva (libros, tesis, informes)
@@ -91,7 +95,15 @@ class ReferenceAuthorsRule(Rule):
             return []
         findings: list[Finding] = []
         for r in bib.references:
-            if r.corporate or r.has_et_al:
+            # Exime a autores institucionales/corporativos (entidades publicas,
+            # organizaciones internacionales, municipios y medios de comunicacion)
+            # de la exigencia del patron de persona natural ("Apellido, Inicial.")
+            if (
+                r.corporate
+                or r.has_et_al
+                or is_corporate_author(author_heading(r.raw))
+                or (r.surnames and any(is_corporate_author(s) for s in r.surnames))
+            ):
                 continue
             # se exige confirmacion por iniciales para no contar mal autores
             if r.author_count > MAX_LISTED_AUTHORS and r.initials_count >= 10:

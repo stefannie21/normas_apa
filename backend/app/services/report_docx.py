@@ -175,6 +175,14 @@ def build_report_docx(report: dict) -> bytes:
     """
     doc = Document()
 
+    # Ensure all sections are in portrait orientation (standard Word layout)
+    from docx.enum.section import WD_ORIENT
+    for sec in doc.sections:
+        sec.orientation = WD_ORIENT.PORTRAIT
+        # Swap width/height if they were set for landscape
+        if sec.page_width > sec.page_height:
+            sec.page_width, sec.page_height = sec.page_height, sec.page_width
+
     # Configuración base del documento (márgenes más amplios para presentación formal)
     for section in doc.sections:
         section.top_margin = Inches(1.25)
@@ -291,8 +299,20 @@ def build_report_docx(report: dict) -> bytes:
             cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph()
 
-    # ------------------ Comentarios por seccion ------------------
-    doc.add_heading("Comentarios y observaciones por sección", level=1)
+    # ------------------ Tabla de hallazgos ------------------
+    doc.add_heading("Detalle de hallazgos", level=1)
+
+    intro = doc.add_paragraph()
+    intro_run = intro.add_run(
+        "A continuación se presenta el detalle de cada hallazgo encontrado en el "
+        "documento, ordenado desde los más importantes (errores) hasta los menos "
+        "críticos (observaciones). Cada fila incluye el tipo de aviso, la "
+        "descripción del problema, su ubicación en el documento y la acción "
+        "recomendada para corregirlo."
+    )
+    intro_run.font.size = Pt(10.5)
+    intro_run.font.color.rgb = RGBColor(0x56, 0x65, 0x73)
+    intro.paragraph_format.space_after = Pt(10)
 
     if not findings:
         ok = doc.add_paragraph()
@@ -303,7 +323,7 @@ def build_report_docx(report: dict) -> bytes:
         _footer_note(doc)
         return _save(doc)
 
-    # Los errores primero: es lo primero que hay que corregir.
+    # Ordenar: errores primero, luego advertencias, luego observaciones
     priority = {"error": 0, "warning": 1, "info": 2}
     ordered = sorted(
         findings,
@@ -313,46 +333,72 @@ def build_report_docx(report: dict) -> bytes:
         ),
     )
 
-    # agrupar por seccion del documento
-    grupos: dict[str, list[dict]] = {}
-    for f in ordered:
-        sec = str((f.get("extra") or {}).get("section") or "").strip()
-        grupos.setdefault(sec, []).append(f)
+    # --------------- Tabla por cada nivel de gravedad ---------------
+    for sev_key, sev_title in [("error", "Errores"), ("warning", "Advertencias"), ("info", "Observaciones")]:
+        grupo = [f for f in ordered if str(f.get("severity", "info")) == sev_key]
+        if not grupo:
+            continue
 
-    # los avisos que no son de un parrafo concreto van primero, bajo su propio
-    # encabezado: son de todo el documento (margenes, tipografia, orden...)
-    grupos_orden: list[tuple[str, list[dict]]] = []
-    generales = grupos.pop("", None)
-    if generales:
-        grupos_orden.append(("Aspectos generales del documento", generales))
-    for sec, lista in grupos.items():
-        grupos_orden.append((sec, lista))
+        # Subtítulo de la sección de gravedad
+        sev_heading = doc.add_paragraph()
+        sev_heading.paragraph_format.space_before = Pt(14)
+        sev_heading.paragraph_format.space_after = Pt(6)
+        sev_heading.paragraph_format.keep_with_next = True
+        h_run = sev_heading.add_run(f"{sev_title} ({len(grupo)})")
+        h_run.bold = True
+        h_run.font.size = Pt(12)
+        h_run.font.color.rgb = SEVERITY_COLOR.get(sev_key, TITULO_COLOR)
 
-    # las secciones se ordenan como aparecen en el documento, no alfabeticamente:
-    # el asesor recorre la tesis de principio a fin
-    def _posicion(lista: list[dict]) -> int:
-        return min(
-            (f.get("paragraph_index") for f in lista if f.get("paragraph_index") is not None),
-            default=10**9,
-        )
+        # Crear tabla: 4 columnas con anchos fijos proporcionales
+        tbl = doc.add_table(rows=1, cols=4)
+        tbl.style = "Light Grid Accent 1"
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
 
-    grupos_orden.sort(key=lambda par: _posicion(par[1]))
+        # Encabezados
+        headers = ["N.°", "Aviso", "Ubicación", "Cómo corregirlo"]
+        col_widths = [Inches(0.45), Inches(2.4), Inches(1.15), Inches(2.0)]
+        hdr_cells = tbl.rows[0].cells
+        for i, h_text in enumerate(headers):
+            hdr_cells[i].text = h_text
+            hdr_cells[i].width = col_widths[i]
+            for run in hdr_cells[i].paragraphs[0].runs:
+                run.bold = True
+                run.font.size = Pt(9.5)
+        _set_repeat_header(tbl.rows[0])
 
-    for sec, lista in grupos_orden:
-        # dentro de la seccion, primero los errores y luego el orden del texto
-        lista = sorted(
-            lista,
-            key=lambda f: (
-                priority.get(str(f.get("severity", "info")), 3),
-                f.get("paragraph_index") if f.get("paragraph_index") is not None else 10**9,
-            ),
-        )
-        cuenta = {"error": 0, "warning": 0, "info": 0}
-        for f in lista:
-            cuenta[str(f.get("severity", "info"))] = cuenta.get(str(f.get("severity", "info")), 0) + 1
-        _seccion_heading(doc, sec, cuenta)
-        for f in lista:
-            _observacion(doc, f)
+        # Filas de datos
+        for idx, f in enumerate(grupo, start=1):
+            message = str(f.get("message", "")).strip()
+            location = str(f.get("location", "")).strip() or "General"
+            suggestion = str(f.get("suggestion", "")).strip()
+            excerpt = str(f.get("excerpt", "")).strip()
+
+            # Construir descripción del aviso (sin rule_id)
+            aviso_text = message
+            if excerpt:
+                aviso_text += f'\n"{excerpt[:180]}"'
+
+            # Construir sugerencia
+            if not suggestion:
+                suggestion = "Revisar este punto manualmente."
+
+            row_cells = tbl.add_row().cells
+            row_cells[0].text = str(idx)
+            row_cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            row_cells[1].text = aviso_text
+            row_cells[2].text = location
+            row_cells[3].text = suggestion
+
+            # Formatear tamaño de fuente y anchos en cada celda
+            for i, cell in enumerate(row_cells):
+                cell.width = col_widths[i]
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.size = Pt(9.5)
+
+        doc.add_paragraph()  # espacio entre tablas
 
     ai_review = report.get("ai_review")
     if ai_review and ai_review.get("notes"):
