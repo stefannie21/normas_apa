@@ -622,6 +622,11 @@ body.show-ruler .canvas::before {
 .sheet h3 { font-size: 1.12em; }
 .sheet img, .sheet svg { max-width: 100%; max-height: var(--content-h, 864px); height: auto; }
 .sheet table { max-width: 100%; align-self: flex-start; }
+/* En Word los parrafos de una celda no llevan el margen de 1em que el navegador
+   pone por defecto: se anula (en la hoja y en el medidor) para que las tablas
+   midan como en el .docx. Si el documento trae espaciado propio, se aplica en
+   linea y gana. */
+.sheet td p, .sheet th p, #apa-measurer td p, #apa-measurer th p { margin: 0; }
 .sheet > img { align-self: flex-start; }
 /* el medidorhidden replica el contexto de la hoja; tablas e imagenes deben
    comportarse igual ahi o medirian distinto de como se pintan */

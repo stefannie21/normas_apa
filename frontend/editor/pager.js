@@ -452,10 +452,6 @@ const Pager = (function () {
     lastSections = sections && sections.length ? sections : null;
     const list = lastSections || [DEFAULT_SECTION];
     const geoms = list.map(geom);
-    const keyToSection = {};
-    list.forEach((s, i) => {
-      if (s && s.first_key) keyToSection[s.first_key] = i;
-    });
 
     const m = getMeasurer(root);
     m.innerHTML = "";
@@ -475,14 +471,31 @@ const Pager = (function () {
       lastBottom = 0;
     };
 
-    // cada bloque conserva la seccion a la que pertenece
+    // Cada bloque conserva la seccion a la que pertenece. Se avanza de a una
+    // seccion: primero se comprueba la clave de la seccion actual y, si no
+    // coincide, la de la siguiente que tenga texto. Comparar contra un mapa
+    // global de claves hacia saltar a la ultima seccion cuando dos empiezan con
+    // el mismo texto (la portada y la caratula del anexo) y todo el documento
+    // heredaba despues la geometria de esa seccion.
+    function firstKeyOf(i) {
+      const s = list[i];
+      return s && s.first_key ? s.first_key : "";
+    }
+
     function resolveSection(unit) {
       if (unit.dataset && unit.dataset.section !== undefined && unit.dataset.section !== "") {
         return Number(unit.dataset.section);
       }
       let sec = sectionIndex;
       const k = textKey(unit);
-      if (k && keyToSection[k] !== undefined && keyToSection[k] >= sec) sec = keyToSection[k];
+      if (k && k !== firstKeyOf(sec)) {
+        for (let j = sec + 1; j < list.length; j++) {
+          const kj = firstKeyOf(j);
+          if (!kj) continue; // seccion sin texto: no se puede reconocer
+          if (kj === k) sec = j;
+          break; // solo la siguiente seccion con texto
+        }
+      }
       if (unit.dataset) unit.dataset.section = String(sec);
       return sec;
     }
@@ -617,7 +630,12 @@ const Pager = (function () {
   function toFlowHtml(root, skipSelector) {
     return collectUnits(root)
       .filter((el) => !(skipSelector && el.matches && el.matches(skipSelector)))
-      .map((el) => el.outerHTML)
+      .map((el) => {
+        // data-section es geometria calculada, no contenido: si se guarda en la
+        // sesion, una asignacion equivocada se arrastra en cada recarga.
+        if (el.dataset) delete el.dataset.section;
+        return el.outerHTML;
+      })
       .join("");
   }
 

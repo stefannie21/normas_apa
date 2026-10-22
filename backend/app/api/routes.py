@@ -7,6 +7,7 @@ import unicodedata
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Length
+from docx.text.paragraph import Paragraph
 from lxml import etree
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -156,6 +157,21 @@ def _ends_with_page_break(paragraph) -> bool:
     except Exception:
         pass
     return False
+
+
+def _iter_paragraphs(doc):
+    """Parrafos del cuerpo en orden de documento, incluidos los de las tablas.
+
+    doc.paragraphs se salta las celdas: sin esto, el texto de una tabla (por
+    ejemplo la matriz de consistencia, escrita a 8 pt) se pintaba con el tamano
+    del documento, las filas crecian y la tabla desbordaba la hoja.
+    """
+    for child in doc.element.body.iterchildren():
+        if child.tag == W_NS + "p":
+            yield Paragraph(child, doc)
+        elif child.tag == W_NS + "tbl":
+            for p in child.iter(W_NS + "p"):
+                yield Paragraph(p, doc)
 
 
 def _paragraph_metrics(p) -> dict:
@@ -355,7 +371,7 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
         doc = Document(io.BytesIO(data))
         paragraphs = []
         break_next = False
-        for p in doc.paragraphs:
+        for p in _iter_paragraphs(doc):
             key = _text_key(p.text)
             starts_new_page = _breaks_before(p) or break_next
             break_next = _ends_with_page_break(p)

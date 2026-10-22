@@ -1510,6 +1510,10 @@ const App = (function () {
       analyzeBtn.disabled = false;
       saveBtn.disabled = false;
       page.innerHTML = doc.flow;
+      // La seccion de cada bloque es geometria calculada: si una sesion
+      // anterior la guardo mal, el error se arrastraba en cada recarga. Se
+      // borra para que el paginador la vuelva a deducir del texto.
+      page.querySelectorAll("[data-section]").forEach((el) => el.removeAttribute("data-section"));
       // Las sesiones guardadas antes de este arreglo ya traerian el indice
       // generado dentro del flujo (a veces partido en varios bloques). Se quitan
       // TODOS antes de reconstruirlo, o el indice se veria repetido.
