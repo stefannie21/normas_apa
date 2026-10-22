@@ -175,17 +175,39 @@ def build_report_docx(report: dict) -> bytes:
     """
     doc = Document()
 
-    # Configuracion base del documento
+    # Configuración base del documento (márgenes más amplios para presentación formal)
     for section in doc.sections:
-        section.top_margin = Inches(1)
-        section.bottom_margin = Inches(1)
-        section.left_margin = Inches(1)
-        section.right_margin = Inches(1)
+        section.top_margin = Inches(1.25)
+        section.bottom_margin = Inches(1.25)
+        section.left_margin = Inches(1.25)
+        section.right_margin = Inches(1.25)
 
+    # Estilo "Normal" con fuente Times New Roman, tamaño 12 pt y espaciado adecuado
     normal = doc.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.font.size = Pt(11)
+    normal.font.name = "Times New Roman"
+    normal.font.size = Pt(12)
     normal.paragraph_format.space_after = Pt(6)
+
+    # Encabezado y pie de página: número de página centrado
+    section = doc.sections[0]
+    # Pie de página con número de página
+    footer = section.footer
+    # Asegurarse de que exista un párrafo
+    if not footer.paragraphs:
+        footer.add_paragraph()
+    foot_par = footer.paragraphs[0]
+    foot_par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Campo de numero de pagina. Ojo: w:fldSimple es un elemento del parrafo,
+    # no de un run; si se mete dentro de <w:r> Word no lo muestra. Se agrega un
+    # run con un valor inicial para que el numero se vea antes de actualizar.
+    fld = OxmlElement('w:fldSimple')
+    fld.set(qn('w:instr'), 'PAGE')
+    run = OxmlElement('w:r')
+    txt = OxmlElement('w:t')
+    txt.text = '1'
+    run.append(txt)
+    fld.append(run)
+    foot_par._p.append(fld)
 
     summary = report.get("summary", {}) or {}
     by_sev = summary.get("by_severity", {}) or {}
