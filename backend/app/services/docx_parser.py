@@ -18,6 +18,9 @@ WP_NS = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing
 # leyeran, cada imagen saldría duplicada.
 MC_FALLBACK_NS = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
 EMU_PER_CM = 360000.0
+# 1 punto PostScript = 12700 EMU: es la unidad en que Word mide los
+# desplazamientos de una imagen flotante (wp:posOffset).
+EMU_PER_PT = 12700.0
 
 # Tamano de pagina por defecto: A4 (21 x 29.7 cm). Se usa solo cuando el .docx
 # no declara w:pgSz. Antes caia en Carta (8.5 x 11 in), que no es el papel
@@ -118,10 +121,31 @@ class ParsedDocument:
     default_font: str | None
     default_font_size_pt: float | None
     references_start: int | None = None
+    main_body_start: int = 0
+    cover_end: int = 0
     bibliography: object | None = None
     tables: list[TableInfo] = field(default_factory=list)
     # titulo de la seccion (encabezado) a la que pertenece cada parrafo
     section_titles: list[str] = field(default_factory=list)
+
+    def is_cover_paragraph(self, p: ParagraphInfo) -> bool:
+        """Determina si un párrafo pertenece a la portada o carátula del documento."""
+        if p.index < self.cover_end:
+            return True
+        if getattr(p, "estimated_page", 1) == 1 and p.index < self.main_body_start:
+            return True
+        if p.index < self.main_body_start and bool(COVER_INDICATORS_RE.search(p.text)):
+            return True
+        return False
+
+    def is_chapter_title(self, p: ParagraphInfo) -> bool:
+        """Determina si un párrafo es el título de un capítulo principal
+        (ej: 'CAPÍTULO I: INTRODUCCIÓN', 'CAPÍTULO II: MARCO TEÓRICO', etc.)."""
+        text = p.text.strip()
+        if not text:
+            return False
+        clean = re.sub(r"^[.\s\-–—#]+", "", text).strip()
+        return bool(CHAPTER_TITLE_RE.search(clean))
 
     def section_title(self, index: int | None) -> str:
         """Encabezado de la seccion donde esta el parrafo ("" si no hay)."""
@@ -448,6 +472,50 @@ def _iter_body_paragraphs(doc: DocxDocument):
     yield from walk(body)
 
 
+def _emu_to_pt(value: str | None) -> float | None:
+    """EMU (unidad interna de Word) a puntos PostScript."""
+    try:
+        return round(int(value) / EMU_PER_PT, 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_box(extent) -> dict:
+    """Posicion de una imagen flotante, si el autor la anclo con <wp:anchor>.
+
+    En Word una imagen anclada NO ocupa altura de linea: se dibuja encima del
+    texto, en el desplazamiento que fijo el autor. Si se pinta como imagen
+    normal, el parrafo crece y todo lo que viene detras baja. En la portada de
+    una tesis eso desplaza media hoja: el logo mide 78 pt y Word le da 0.
+    """
+    anchor = None
+    for parent in extent.iterancestors():
+        if parent.tag == WP_NS + "anchor":
+            anchor = parent
+            break
+        if parent.tag == WP_NS + "inline":
+            return {"anchored": False}
+    if anchor is None:
+        return {"anchored": False}
+
+    info: dict = {"anchored": True}
+    pos_h = anchor.find(WP_NS + "positionH")
+    if pos_h is not None:
+        info["h_from"] = pos_h.get("relativeFrom")
+        off = _emu_to_pt(pos_h.findtext(WP_NS + "posOffset"))
+        if off is not None:
+            info["offset_h_pt"] = off
+    pos_v = anchor.find(WP_NS + "positionV")
+    if pos_v is not None:
+        info["v_from"] = pos_v.get("relativeFrom")
+        off = _emu_to_pt(pos_v.findtext(WP_NS + "posOffset"))
+        if off is not None:
+            info["offset_v_pt"] = off
+    # detras del texto o por delante: decide si tapa el contenido
+    info["behind"] = anchor.get("behindDoc") == "1"
+    return info
+
+
 def image_sizes(data: bytes) -> list[dict]:
     """Tamano con el que el autor coloco cada imagen, en centimetros.
 
@@ -456,6 +524,9 @@ def image_sizes(data: bytes) -> list[dict]:
     pixeles: una figura colocada a 6 cm se ve ocupando toda la caja de texto.
     Se devuelven en orden de documento, que es el mismo en que mammoth las
     emite, para poder emparejarlas una a una.
+
+    Cada entrada dice ademas si la imagen va anclada (flotante) y en que
+    desplazamiento, porque esas no empujan el texto hacia abajo.
     """
     try:
         doc: DocxDocument = Document(BytesIO(data))
@@ -475,12 +546,54 @@ def image_sizes(data: bytes) -> list[dict]:
             continue
         if cx <= 0 or cy <= 0:
             continue
-        out.append(
-            {
-                "width_cm": round(cx / EMU_PER_CM, 3),
-                "height_cm": round(cy / EMU_PER_CM, 3),
-            }
-        )
+        entry = {
+            "width_cm": round(cx / EMU_PER_CM, 3),
+            "height_cm": round(cy / EMU_PER_CM, 3),
+        }
+        entry.update(_float_box(extent))
+        out.append(entry)
+    return out
+
+
+def empty_paragraph_marks(data: bytes) -> list[float | None]:
+    """Tamano de la marca de parrafo de cada parrafo vacio, en puntos.
+
+    Un parrafo vacio de Word mide lo que mida su marca de parrafo (el caracter
+    invisible que cierra la linea), no lo que mida el texto. En las portadas
+    hay espaciadores con la marca a 18 pt que ocupan 20.7 pt de alto: si se
+    pintan con el tamano por defecto del documento (12 pt) miden 13.8 pt y el
+    bloque de abajo sube. Se devuelven en orden de documento, que es el mismo
+    en que mammoth emite los parrafos vacios.
+
+    Se recorren solo los parrafos del cuerpo (no los de tablas ni cajas de
+    texto, que en el flujo HTML van en otro orden) y se descartan los que solo
+    llevan una imagen: esos se pintan como figura, no como linea en blanco.
+    """
+    try:
+        doc: DocxDocument = Document(BytesIO(data))
+    except Exception:
+        return []
+
+    out: list[float | None] = []
+    for p in doc.paragraphs:
+        if p.text.strip():
+            continue
+        if p._p.find(".//" + W_NS + "drawing") is not None:
+            continue
+        if p._p.find(".//" + W_NS + "pict") is not None:
+            continue
+        mark = None
+        pPr = p._p.pPr
+        if pPr is not None:
+            rPr = pPr.find(W_NS + "rPr")
+            if rPr is not None:
+                sz = rPr.find(W_NS + "sz")
+                if sz is not None:
+                    try:
+                        mark = int(sz.get(W_NS + "val")) / 2
+                    except (TypeError, ValueError):
+                        mark = None
+        out.append(mark)
     return out
 
 

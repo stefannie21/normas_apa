@@ -569,6 +569,12 @@ body.show-ruler .canvas::before {
   align-items: center;
   gap: 26px;
   padding: 32px 24px 90px;
+  /* La fuente del documento la pone enrichHtml() con los metadatos del .docx.
+     Si el backend no la trae, se usa Arial (no "Segoe UI" de la interfaz)
+     porque es la fuente por defecto mas comun en tesis y trabajos academicos. */
+  font-family: Arial, "Helvetica", sans-serif;
+  font-size: 12pt;
+  line-height: 1.15;
   /* las hojas horizontales son mas anchas que el area visible: se desplazan
      horizontalmente en vez de quedar recortadas a la derecha */
   overflow-x: auto;
@@ -620,6 +626,36 @@ body.show-ruler .canvas::before {
 .sheet h1 { font-size: 1.5em; }
 .sheet h2 { font-size: 1.3em; }
 .sheet h3 { font-size: 1.12em; }
+
+/* ---------- Espaciado de los bloques (fidelidad con Word) ----------
+   El navegador aplica por su cuenta 1em arriba y abajo a cada p, h1..h6, ul,
+   ol, blockquote (y mas en los titulos). Word NO tiene esos margenes: el
+   espaciado real del .docx llega en linea desde enrichHtml() (sb/sa) y, si el
+   parrafo no declara nada, Word no deja hueco.
+
+   Dejar los margenes del navegador inflaba cada parrafo ~32 px y, sobre todo,
+   cada parrafo VACIO de la portada (que el .docx usa como espaciador): en Word
+   un parrafo vacio mide una linea (~18 px) y aqui medía 32 px. Con una decena
+   de ellos la portada crecia ~140 px y la ultima linea (el "2026") se caia
+   sola a la hoja siguiente. */
+.sheet p, .sheet h1, .sheet h2, .sheet h3, .sheet h4, .sheet h5, .sheet h6,
+.sheet ul, .sheet ol, .sheet dl, .sheet blockquote, .sheet figure, .sheet pre,
+#apa-measurer p, #apa-measurer h1, #apa-measurer h2, #apa-measurer h3,
+#apa-measurer h4, #apa-measurer h5, #apa-measurer h6,
+#apa-measurer ul, #apa-measurer ol, #apa-measurer dl, #apa-measurer blockquote,
+#apa-measurer figure, #apa-measurer pre {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Un parrafo vacio ocupa en Word una linea de texto. Con los margenes a cero
+   se quedaria en 0 px y la portada saldria mas corta que en el original (el
+   texto subiria de hoja), asi que se le devuelve el alto de una linea. */
+.sheet p:empty, #apa-measurer p:empty { min-height: 1.15em; }
+
+/* Las listas conservan la sangria del navegador (40 px ~ 0.42 in), parecida a
+   la de Word; solo se anula el hueco vertical, que Word no tiene. */
+.sheet ul, .sheet ol, #apa-measurer ul, #apa-measurer ol { padding-top: 0; padding-bottom: 0; }
 .sheet img, .sheet svg { max-width: 100%; max-height: var(--content-h, 864px); height: auto; }
 .sheet table { max-width: 100%; align-self: flex-start; }
 /* En Word los parrafos de una celda no llevan el margen de 1em que el navegador

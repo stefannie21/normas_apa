@@ -6,6 +6,7 @@ import unicodedata
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Length
 from docx.text.paragraph import Paragraph
 from lxml import etree
@@ -16,7 +17,11 @@ from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
 from backend.app.services import ai_filter, ai_reviewer, report
 from backend.app.services.analyzer import analyze
-from backend.app.services.docx_parser import image_sizes, parse_docx
+from backend.app.services.docx_parser import (
+    empty_paragraph_marks,
+    image_sizes,
+    parse_docx,
+)
 from backend.app.services.docx_writer import apply_corrections
 from backend.app.services.report_docx import build_report_docx
 
@@ -211,11 +216,24 @@ def _paragraph_metrics(p) -> dict:
         if s is not None and r.text.strip():
             sizes.append(round(s.pt, 1))
 
+    # Espaciado "automatico" de Word: cuando esta puesto, Word ignora el valor
+    # numerico de before/after y usa el suyo (14 pt para el texto de 12 pt del
+    # cuerpo). Si no se traslada, el parrafo queda 9 pt mas pegado al de arriba.
+    auto_before = auto_after = False
+    pPr = p._p.pPr
+    if pPr is not None:
+        sp = pPr.find(qn("w:spacing"))
+        if sp is not None:
+            auto_before = sp.get(qn("w:beforeAutospacing")) == "1"
+            auto_after = sp.get(qn("w:afterAutospacing")) == "1"
+
     return {
         "ls": round(float(ls), 2) if isinstance(ls, (int, float)) else None,
         "sb": pt(pf.space_before, spf.space_before),
         "sa": pt(pf.space_after, spf.space_after),
         "size": max(sizes) if sizes else None,
+        "ab": auto_before,
+        "aa": auto_after,
     }
 
 
@@ -390,6 +408,9 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
             "defaults": _doc_defaults(doc),
             # tamano declarado de cada figura, en orden de documento
             "images": image_sizes(data),
+            # alto real de cada parrafo vacio: lo marca su tamano de letra,
+            # no el del texto que no tiene
+            "empty_marks": empty_paragraph_marks(data),
         }
     except HTTPException:
         raise

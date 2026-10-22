@@ -1,4 +1,4 @@
-/* Logica principal: carga de .docx, edicion y analisis APA. */
+﻿/* Logica principal: carga de .docx, edicion y analisis APA. */
 import { Pager } from "./pager.js";
 import { Commands } from "./commands.js";
 import { Marker } from "./marker.js";
@@ -14,12 +14,20 @@ const App = (function () {
   const SEVERITY_ICON = { error: "!", warning: "!", info: "i" };
   const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
 
+  // Version del HTML que produce el conversor (mammoth + enrichHtml). Se sube
+  // cuando cambia algo en la conversion para que las sesiones ya guardadas en
+  // el navegador se vuelvan a generar en vez de reutilizar el HTML antiguo.
+  //  1: sin conservar los parrafos vacios del .docx
+  //  2: los conserva (portadas que se empujan con lineas en blanco)
+  //  3: los vacios miden lo que su marca de parrafo y las imagenes flotantes
+  //     dejan de ocupar altura (portada con logo anclado)
+  const FLOW_VERSION = 3;
+
   const page = document.getElementById("page");
   const emptyState = document.getElementById("empty-state");
   const fileInput = document.getElementById("file");
   const docName = document.getElementById("doc-name");
   const analyzeBtn = document.getElementById("analyze-btn");
-  const openBtn = document.getElementById("open-btn");
   const emptyOpen = document.getElementById("empty-open");
   const statusMsg = document.getElementById("status-msg");
   const statusWords = document.getElementById("status-words");
@@ -71,7 +79,6 @@ const App = (function () {
   });
 
   /* ---------- Archivo ---------- */
-  openBtn.addEventListener("click", () => fileInput.click());
   emptyOpen.addEventListener("click", () => fileInput.click());
   analyzeBtn.addEventListener("click", () => runAnalysis());
   fileInput.addEventListener("change", () => {
@@ -179,8 +186,14 @@ const App = (function () {
         if (!info) return;
 
         if (info.align && info.align !== "left") el.style.textAlign = info.align;
-        if (info.sb != null) el.style.marginTop = info.sb + "pt";
-        if (info.sa != null) el.style.marginBottom = info.sa + "pt";
+        // Espaciado "automático" de Word: con la casilla Auto puesta, Word
+        // ignora el número y pone 14 pt (medido en Word para el cuerpo de
+        // 12 pt). Si no se aplica, el párrafo sube 9 pt respecto al de arriba.
+        const auto = Math.max(14, (info.size || 12) * 1.15);
+        if (info.ab) el.style.marginTop = auto + "pt";
+        else if (info.sb != null) el.style.marginTop = info.sb + "pt";
+        if (info.aa) el.style.marginBottom = auto + "pt";
+        else if (info.sa != null) el.style.marginBottom = info.sa + "pt";
         if (info.size) el.style.fontSize = info.size + "pt";
         // el factor se calcula con la FUENTE DEL DOCUMENTO (Arial en este caso)
         // y no con la que hereda el parrafo, que seria la de la interfaz
@@ -201,9 +214,51 @@ const App = (function () {
       // El orden del backend es el mismo en que mammoth emite los <img>.
       const imgs = Array.from(tmp.querySelectorAll("img"));
       (meta.images || []).forEach((s, i) => {
-        if (!imgs[i] || !s) return;
-        imgs[i].setAttribute("data-docx-w", s.width_cm);
-        imgs[i].setAttribute("data-docx-h", s.height_cm);
+        const img = imgs[i];
+        if (!img || !s) return;
+        img.setAttribute("data-docx-w", s.width_cm);
+        img.setAttribute("data-docx-h", s.height_cm);
+        if (s.width_cm) img.style.width = s.width_cm + "cm";
+        if (s.height_cm) img.style.height = s.height_cm + "cm";
+
+        // Imagen FLOTANTE: en Word está anclada a un punto de la página y NO
+        // ocupa altura de línea; el texto sigue como si no estuviera. Si se
+        // pinta como imagen normal, el párrafo crece lo que mida la figura y
+        // todo lo que viene detrás baja. En la portada el logo mide 78 pt y
+        // Word le da 0: por eso la portada salía empujada media hoja.
+        if (!s.anchored) return;
+        const holder = img.parentElement;
+        if (!holder) return;
+        holder.style.position = "relative";
+        // El párrafo que solo lleva la imagen anclada sigue siendo UNA línea en
+        // Word (la de su marca de párrafo). Al sacar la imagen del flujo se
+        // queda sin contenido y mediría 0: se le devuelve esa línea.
+        if (!holder.textContent.replace(/\u00a0/g, " ").trim()) {
+          holder.style.minHeight = "1.15em";
+        }
+        img.style.position = "absolute";
+        img.style.left = (s.offset_h_pt || 0) + "pt";
+        img.style.top = (s.offset_v_pt || 0) + "pt";
+        img.style.margin = "0";
+        img.style.zIndex = s.behind ? "0" : "3";
+        img.setAttribute("data-anchored", "1");
+      });
+
+      // Alto real de los párrafos vacíos: lo fija el tamaño de su marca de
+      // párrafo, no el del texto (que no hay). Los espaciadores de la portada
+      // escritos con la marca a 18 pt miden 20.7 pt en Word; pintados con los
+      // 12 pt por defecto miden 13.8 pt y el bloque de abajo sube 7 pt cada
+      // uno. Se emparejan por orden con los <p> en blanco del flujo.
+      const blanks = blocks.filter(
+        (el) =>
+          /^P$/i.test(el.tagName) &&
+          !el.querySelector("img") &&
+          !el.closest("td,th") &&
+          !el.textContent.replace(/\u00a0/g, " ").trim()
+      );
+      (meta.empty_marks || []).forEach((pt, i) => {
+        if (pt == null || !blanks[i]) return;
+        blanks[i].style.fontSize = pt + "pt";
       });
 
       const out = tmp.innerHTML;
@@ -218,6 +273,62 @@ const App = (function () {
     const f = String(name || "").trim();
     if (!f) return "";
     return /[a-zA-Z]/.test(f) && !/^["']/.test(f) && !/,/.test(f) ? "'" + f.replace(/'/g, "") + "'" : f;
+  }
+
+  /* mammoth BORRA los parrafos vacios del .docx, y en Word son espaciadores de
+     verdad: las portadas de tesis se empujan hacia abajo con ellos. Al quitarlos
+     la portada salia hasta 3 pulgadas mas corta que en Word: las lineas se
+     apelotonaban arriba y el "2026" del pie subia de sitio (o se caia a la hoja
+     siguiente si el resto del texto lo empujaba).
+     El modelo de documento de mammoth SI conserva esos parrafos (solo los
+     descarta al generar el HTML), asi que aqui se les anade un espacio duro: el
+     generador emite <p>&nbsp;</p> y la linea recupera su altura. */
+  function keepEmptyParagraphs(doc) {
+    const walk = (el) => {
+      if (!el || typeof el !== "object") return;
+      if (el.type === "paragraph" && (!el.children || el.children.length === 0)) {
+        el.children = [{ type: "run", children: [{ type: "text", value: "\u00a0" }] }];
+      }
+      (el.children || []).forEach(walk);
+    };
+    walk(doc);
+    return doc;
+  }
+
+  /* Devuelve el HTML del flujo de una sesion guardada.
+     Si la sesion se creo con una version anterior del conversor, el HTML que
+     trae no tiene los arreglos posteriores (por ejemplo los parrafos vacios de
+     la portada) y el documento se veria igual que antes aunque el codigo ya
+     este corregido: se rehace la conversion desde el .docx original, que la
+     sesion guarda en `bytes`. Si no hay bytes o algo falla, se usa el guardado.
+
+     OJO: al reconvertir se parte del .docx original, asi que las ediciones
+     hechas a mano en el visor de esa sesion vieja no se conservan. Por eso
+     flowRegenerated queda marcado y restoreSession avisa al usuario. */
+  let flowRegenerated = false;
+  // la sesion es de un conversor anterior y no se pudo rehacer (no hay .docx):
+  // se queda como estaba, pero hay que decirlo en vez de dejar al usuario
+  // mirando una portada que "sigue igual" sin saber por que.
+  let flowStale = false;
+  async function flowForSession(doc) {
+    if (!doc) return "";
+    if (doc.flowVersion === FLOW_VERSION) return doc.flow || "";
+    if (!doc.bytes) {
+      flowStale = true;
+      return doc.flow || "";
+    }
+    try {
+      const result = await mammoth.convertToHtml(
+        { arrayBuffer: new Uint8Array(doc.bytes) },
+        { transformDocument: keepEmptyParagraphs }
+      );
+      const html = await enrichHtml(result.value || "<p></p>");
+      flowRegenerated = true;
+      return html;
+    } catch (e) {
+      flowStale = true;
+      return doc.flow || "";
+    }
   }
 
   // Reajusta las imagenes cuando ya han cargado. Antes se usaba el evento 'load'
@@ -256,7 +367,10 @@ const App = (function () {
     const reader = new FileReader();
     reader.onload = () => {
       mammoth
-        .convertToHtml({ arrayBuffer: reader.result })
+        .convertToHtml(
+          { arrayBuffer: reader.result },
+          { transformDocument: keepEmptyParagraphs }
+        )
         .then((result) => enrichHtml(result.value || "<p></p>"))
         .then((html) => {
           page.innerHTML = html;
@@ -352,7 +466,7 @@ const App = (function () {
           </ul>
           <p class="ai-consent-fields">Campos: ${campos}</p>
           <p class="ai-consent-note">El consentimiento vale para esta sesión. Puedes revocarlo
-             desde la cinta (Revisar APA → Quitar consentimiento IA).</p>
+             desde la cinta (Revisar APA â†’ Quitar consentimiento IA).</p>
           <div class="ai-consent-actions">
             <button type="button" data-act="no">Cancelar</button>
             <button type="button" class="primary" data-act="si">Autorizar y revisar</button>
@@ -1134,7 +1248,15 @@ const App = (function () {
   });
 
   function updateCounts() {
-    const text = (Pager.textOf(page) || "").trim();
+    // Los parrafos vacios del .docx llevan un espacio duro para conservar su
+    // altura (ver keepEmptyParagraphs): se descartan al contar para que las
+    // estadisticas no sumen un caracter por cada linea en blanco.
+    const text = (Pager.textOf(page) || "")
+      .split("\n")
+      .map((line) => line.replace(/\u00a0/g, " ").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim();
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
     statusWords.textContent = words.toLocaleString("es") + " palabras";
     statusChars.textContent = text.length.toLocaleString("es") + " caracteres";
@@ -1377,6 +1499,14 @@ const App = (function () {
       // geometria de las secciones: sin esto, al recargar la pagina se
       // perdia que hojas son horizontales y todas se pintaban verticales
       sections: docSections,
+      // fuente y tamano por defecto del documento: si no se guardan, al
+      // restaurar la sesion el #page se queda con la fuente del CSS (Arial)
+      // en vez de la real del .docx (ej: Times New Roman 12)
+      docFont: page.style.fontFamily || "",
+      docSize: page.style.fontSize || "",
+      // version del conversor que produjo `flow`: permite saber si la sesion
+      // guardada se puede reutilizar o hay que reconvertir el .docx
+      flowVersion: FLOW_VERSION,
       savedAt: new Date().toISOString(),
     };
     try {
@@ -1509,7 +1639,9 @@ const App = (function () {
       docName.textContent = doc.name;
       analyzeBtn.disabled = false;
       saveBtn.disabled = false;
-      page.innerHTML = doc.flow;
+      // Si la sesion viene de un conversor anterior se rehace el flujo aqui:
+      // si no, se seguiria viendo el documento tal como estaba antes del arreglo.
+      page.innerHTML = await flowForSession(doc);
       // La seccion de cada bloque es geometria calculada: si una sesion
       // anterior la guardo mal, el error se arrastraba en cada recarga. Se
       // borra para que el paginador la vuelva a deducir del texto.
@@ -1528,6 +1660,30 @@ const App = (function () {
       if (!docSections && currentFile) {
         docSections = await fetchSections(currentFile);
       }
+      // Restaurar la fuente y tamano del documento: si no se hace, al
+      // recargar la pagina el #page se queda con la fuente del CSS (Arial)
+      // en vez de la real del .docx (ej: Times New Roman 12). Solo se pisa si
+      // la sesion los trae: si el flujo se acaba de reconvertir, enrichHtml()
+      // ya dejo puesta la fuente correcta y no hay que borrarla.
+      if (doc.docFont) page.style.fontFamily = doc.docFont;
+      if (doc.docSize) page.style.fontSize = doc.docSize;
+      // Si la sesion no trae fuente y hay un .docx original, se la pide al
+      // backend para no perderla (sesiones guardadas antes de este arreglo).
+      if ((!doc.docFont || !doc.docSize) && currentFile) {
+        try {
+          const data = new FormData();
+          data.append("file", currentFile, currentFile.name);
+          const res = await fetch("/api/docx-meta", { method: "POST", body: data });
+          if (res.ok) {
+            const meta = await res.json();
+            const defs = meta.defaults || {};
+            if (defs.font && !doc.docFont) page.style.fontFamily = quoteFont(defs.font);
+            if (defs.size_pt && !doc.docSize) page.style.fontSize = defs.size_pt + "pt";
+          }
+        } catch (e) {
+          /* sin metadatos: se usa la fuente del CSS */
+        }
+      }
       Pager.paginate(page, docSections);
       updateTocPages();
       page.contentEditable = "true";
@@ -1544,7 +1700,28 @@ const App = (function () {
         hour: "2-digit",
         minute: "2-digit",
       });
-      showToast("Sesión restaurada: " + doc.name + " (" + when + ").", "info");
+      if (flowRegenerated) {
+        // Se rehizo el flujo desde el .docx: se avisa para que no sorprenda que
+        // el documento no tenga las ediciones hechas en el visor antes del cambio.
+        flowRegenerated = false;
+        showToast(
+          "Documento reconvertido con el visor actualizado (" + doc.name + "). " +
+            "Las ediciones hechas solo en pantalla no se conservan.",
+          "info"
+        );
+      } else if (flowStale) {
+        // Sin el .docx original no hay de donde rehacer la conversion: se dice
+        // que hay que volver a abrirlo, o la portada seguira viendose igual.
+        flowStale = false;
+        showToast(
+          "Este documento se guardó con una versión anterior del visor y no se " +
+            "puede rehacer sin el .docx original. Vuelve a abrir el archivo para " +
+            "ver la portada corregida.",
+          "info"
+        );
+      } else {
+        showToast("Sesión restaurada: " + doc.name + " (" + when + ").", "info");
+      }
     } catch (e) {
       /* si el guardado esta corrupto, se ignora y se empieza limpio */
     }
@@ -1604,7 +1781,7 @@ const App = (function () {
           <b>${titulo}</b>
           <span class="orient-count">${total} de ${r.total} páginas</span>
         </div>
-        <p class="orient-pages">${paginas.length ? paginas.join(", ") : "—"}</p>
+        <p class="orient-pages">${paginas.length ? paginas.join(", ") : "â€”"}</p>
       </div>`;
     orientBody.innerHTML =
       bloque("Páginas horizontales (landscape)", "h", r.horiz, r.horiz.length ? cuenta(r.horiz) : 0) +

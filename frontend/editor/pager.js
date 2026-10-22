@@ -206,7 +206,13 @@ const Pager = (function () {
     return el && el.nodeType === 1 && el.classList.contains("page-break");
   }
 
-  function isSplittable(el) {
+  // Los parrafos NUNCA se parten entre hojas en el flujo normal: al cortarlos
+  // por palabras el documento se deformaba (el trozo que quedaba en una hoja
+  // perdia su formato y la continuacion aparecia como un parrafo nuevo). Ahora
+  // se mueven completos a la siguiente hoja si no caben, como hace Word.
+  // canSplitParagraph() solo se usa para el caso extremo de un parrafo MAS ALTO
+  // QUE UNA HOJA ENTERA, donde partirlo es la unica salida (ver splitUnit).
+  function canSplitParagraph(el) {
     if (!el || el.nodeType !== 1) return false;
     if (!/^(P|DIV)$/.test(el.tagName)) return false;
     // el indice y los bloques con contenido estructurado nunca se parten
@@ -355,7 +361,11 @@ const Pager = (function () {
   // Reparte una unidad que no cabe en limitePx. Cada tipo se corta por su
   // naturaleza: el indice por entradas, una tabla por filas y un parrafo por
   // palabras. Devuelve null si no se puede partir.
-  function splitUnit(unit, limitPx, contentW) {
+  //
+  // `force` solo llega cuando el bloque es MAS ALTO QUE UNA HOJA ENTERA: ahi no
+  // hay alternativa, porque dejarlo entero lo haria salirse del papel. En el
+  // flujo normal los parrafos no se parten (ver canSplitParagraph).
+  function splitUnit(unit, limitPx, contentW, force) {
     if (!unit || unit.nodeType !== 1) return null;
     if (limitPx <= 0) return null;
     if (unit.classList && unit.classList.contains("doc-toc")) {
@@ -363,7 +373,7 @@ const Pager = (function () {
     }
     if (unit.tagName === "TABLE") return splitTable(unit, limitPx, contentW);
     if (unit.tagName === "OL" || unit.tagName === "UL") return splitList(unit, limitPx, contentW);
-    if (isSplittable(unit)) {
+    if (force && canSplitParagraph(unit)) {
       const k = maxWordsThatFit(unit, limitPx, contentW);
       if (k > 0) return splitParagraph(unit, k);
     }
@@ -554,11 +564,11 @@ const Pager = (function () {
       }
       // No cabe en la hoja actual: primero se intenta llenar el hueco que
       // queda, y si no, cambiar de hoja y repetir alli.
-      const intentarCorte = (limitePx) => {
+      const intentarCorte = (limitePx, force) => {
         // El trozo que se queda en esta hoja conserva el margen inferior del
         // bloque original: hay que reservarlo o la cabeza se cuela por debajo
         // del margen y la hoja se alarga.
-        const cut = splitUnit(unit, limitePx - blk.bottom, g.contentW);
+        const cut = splitUnit(unit, limitePx - blk.bottom, g.contentW, force);
         if (!cut) return false;
         sheet.appendChild(cut.head);
         nextSheet();
@@ -573,7 +583,11 @@ const Pager = (function () {
       nextSheet();
       blk = measureBlock(unit, g.contentW);
       h = blk.h;
-      if (h > g.contentH && intentarCorte(g.contentH - gapBetween(0, blk.top))) return;
+      // Solo si el bloque no cabe NI en una hoja vacia se parte (un parrafo de
+      // mas de una pagina). Antes se partia cualquier parrafo que no cupiera,
+      // y eso deformaba el documento: el trozo que quedaba en una hoja perdia
+      // su formato y la continuacion se veia como un parrafo nuevo.
+      if (h > g.contentH && intentarCorte(g.contentH - gapBetween(0, blk.top), true)) return;
 
       sheet.appendChild(unit);
       used = blk.top + h + blk.bottom;
