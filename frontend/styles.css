@@ -266,16 +266,6 @@ body {
   gap: 8px;
 }
 .card-head [data-icon] svg { width: 17px; height: 17px; stroke: var(--accent); fill: none; }
-.card-link {
-  background: none;
-  border: none;
-  font-family: inherit;
-  font-size: .78rem;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 0;
-}
-.card-link:hover { text-decoration: underline; }
 .card-text { margin: 0 0 10px; font-size: .83rem; color: var(--muted); line-height: 1.55; }
 .card-note {
   margin: 12px 0 0;
@@ -286,7 +276,30 @@ body {
   padding: 8px 10px;
 }
 
-.doc-item { display: flex; align-items: center; gap: 12px; }
+/* Lista "Recién abiertos": filas pulsables con icono, nombre y estado. */
+.recientes { list-style: none; margin: 0 -8px; padding: 0; }
+.rec {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.rec + .rec { box-shadow: inset 0 1px 0 var(--line); }
+.rec:hover { background: #f4f7fb; }
+.rec:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rec.actual { background: var(--accent-soft); }
+.rec.actual .doc-icn { background: #fff; }
+.rec-vacio {
+  padding: 14px 8px;
+  font-size: .83rem;
+  color: var(--muted);
+  line-height: 1.6;
+  text-align: center;
+}
+.rec-vacio b { color: var(--ink); }
+
 .doc-icn {
   width: 36px;
   height: 36px;
@@ -302,32 +315,7 @@ body {
 .doc-body { flex: 1 1 auto; min-width: 0; }
 .doc-name { display: block; font-size: .88rem; font-weight: 600; color: var(--ink); }
 .doc-meta { display: block; font-size: .77rem; color: var(--muted); margin-top: 2px; }
-.doc-estado {
-  flex: 0 0 auto;
-  font-size: .73rem;
-  font-weight: 600;
-  border-radius: 10px;
-  padding: 3px 10px;
-}
-.doc-estado.ok { background: #e2f4e9; color: #1e7a45; }
-.doc-estado.pendiente { background: #fdf0d8; color: #96690d; }
-.doc-acciones { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-.vbtn {
-  border: 1px solid var(--line-strong);
-  background: #fff;
-  border-radius: 7px;
-  padding: 6px 12px;
-  font-size: .8rem;
-  font-family: inherit;
-  cursor: pointer;
-  color: var(--ink);
-}
-.vbtn:hover:not(:disabled) { background: #eef2f7; }
-.vbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.vbtn.primary:hover:not(:disabled) { background: var(--accent-dark); }
 
-.pasos { margin: 0; padding-left: 20px; font-size: .85rem; color: var(--muted); line-height: 1.7; }
-.pasos b { color: var(--ink); }
 .check, .tips { margin: 0; padding-left: 18px; font-size: .83rem; color: var(--muted); line-height: 1.7; }
 .tips li, .check li { margin-bottom: 4px; }
 
@@ -1498,19 +1486,6 @@ body.reading #page { cursor: default; }
 .tv-legend li { display: flex; align-items: center; gap: 8px; font-size: .82rem; }
 .tv-legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 .tv-legend b { margin-left: auto; font-weight: 700; }
-
-.tv-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.tv-actions button {
-  display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 10px; border: 1px solid var(--line); border-radius: 9px;
-  background: #fff; font: inherit; text-align: left; cursor: pointer;
-}
-.tv-actions button:hover { border-color: #b9d2f2; background: var(--accent-soft); }
-.tv-act-icn { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
-.tv-act-icn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
-.tv-actions strong { display: block; font-size: .84rem; font-weight: 600; }
-.tv-actions small { display: block; font-size: .74rem; color: var(--muted); margin-top: 1px; }
-.tv-chev { margin-left: auto; color: var(--muted); font-size: 1.1rem; }
 
 /* ============================================================
    Cinta adaptable
