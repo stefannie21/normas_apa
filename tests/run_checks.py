@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 from tests.make_citas_sample import build_citas_sample  # noqa: E402
 from tests.make_sample import build_sample  # noqa: E402
 from backend.app.services.analyzer import analyze  # noqa: E402
+from backend.app.services.bibliography import ReferenceRecord, author_matches
 from backend.app.services.docx_parser import parse_docx  # noqa: E402
 from backend.app.services.report import build_report, render_html  # noqa: E402
 
@@ -82,6 +83,17 @@ def check_citas() -> None:
     missing_refs = bib.missing_references()
     assert any("Delgado" in " ".join(c.surnames) for c in missing_refs), \
         "Debe detectar la cita de Delgado sin referencia"
+    # cita con 'et al.' de una obra con varios autores: no es faltante aunque
+    # en la lista solo coincida el primer apellido
+    from backend.app.services.bibliography import ReferenceRecord as _Ref, author_matches as _am
+    _multi = _Ref(
+        paragraph_index=999, page=1,
+        raw="Hurtado Barazorda, K., Estrada Araoz, E. G., y Velasquez Giersch, L. (2023). Cultura tributaria. Revista X.",
+        surnames=["Hurtado Barazorda", "Estrada Araoz", "Velasquez Giersch"],
+        year=2023, author_count=3,
+    )
+    assert _am(["Hurtado Barazorda"], _multi), "Et al. debe cruzar con el primer autor"
+    assert _am(["Hurtado"], _multi), "El apellido principal debe cruzar aunque se abrevie"
     # referencia sin citar debe listarse
     uncited = bib.uncited_references()
     assert any("Zapata" in r.surnames for r in uncited), \
