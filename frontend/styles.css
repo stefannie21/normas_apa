@@ -566,10 +566,9 @@ body.show-ruler .canvas::before {
 #page {
   display: flex;
   flex-direction: column;
-  /* flex-start (y no center): con align-items:center el primer bloque que
-     excede el ancho visible quedaba fuera del scroll y el ancho del scroll
-     se computaba sin ese bloque, asi que la barra horizontal no llegaba. */
-  align-items: flex-start;
+  /* centramos las hojas como lo hace Word: si una hoja horizontal es mas ancha
+     que el area visible, queda centrada en vez de pegada al borde izquierdo. */
+  align-items: center;
   gap: 26px;
   padding: 32px 24px 90px;
   /* La fuente del documento la pone enrichHtml() con los metadatos del .docx.
