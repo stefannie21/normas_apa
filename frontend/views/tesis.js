@@ -142,35 +142,6 @@ function render() {
               <ul class="tv-legend" id="tv-legend">${leyendaHtml()}</ul>
             </div>
           </div>
-
-          <div class="tv-card">
-            <div class="tv-card-head">
-              <span class="tv-card-icn">${icon("wand")}</span>
-              <div><h2>Acciones rápidas</h2></div>
-            </div>
-            <ul class="tv-actions">
-              <li><button data-act="new">
-                <span class="tv-act-icn">${icon("folder")}</span>
-                <span><strong>Subir nueva tesis</strong><small>Agrega un nuevo documento</small></span>
-                <span class="tv-chev">&gt;</span>
-              </button></li>
-              <li><button data-act="correccion">
-                <span class="tv-act-icn">${icon("check")}</span>
-                <span><strong>Editar documento</strong><small>Revisa los hallazgos del documento abierto</small></span>
-                <span class="tv-chev">&gt;</span>
-              </button></li>
-              <li><button data-act="plantillas">
-                <span class="tv-act-icn">${icon("save")}</span>
-                <span><strong>Descargar plantillas</strong><small>Formatos recomendados para tu tesis</small></span>
-                <span class="tv-chev">&gt;</span>
-              </button></li>
-              <li><button data-act="ia">
-                <span class="tv-act-icn">${icon("spark")}</span>
-                <span><strong>Guía de formato APA</strong><small>Revisión con IA del documento abierto</small></span>
-                <span class="tv-chev">&gt;</span>
-              </button></li>
-            </ul>
-          </div>
         </aside>
       </div>
     </div>`;
@@ -200,7 +171,7 @@ function pintarTabla() {
         <td class="tv-row-acc">
           <button data-tv-row="open" title="Abrir esta tesis">${Icons.svg("eye", 16)}</button>
           <button data-tv-row="download" title="Descargar el archivo original">${Icons.svg("save", 16)}</button>
-          <button class="danger" data-tv-row="delete" title="Eliminar de la biblioteca">${Icons.svg("paint", 16)}</button>
+          <button class="danger" data-tv-row="delete" title="Eliminar de la biblioteca">${Icons.svg("trash", 16)}</button>
         </td>
       </tr>`;
     })

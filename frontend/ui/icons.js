@@ -47,6 +47,8 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     ruler: '<rect x="3" y="8" width="18" height="8" rx="1"/><line x1="7" y1="8" x2="7" y2="12"/><line x1="11" y1="8" x2="11" y2="13"/><line x1="15" y1="8" x2="15" y2="12"/><line x1="19" y1="8" x2="19" y2="13"/>',
     pilcrow: '<path d="M13 4v16"/><path d="M9 4h8"/><path d="M9 4a4 4 0 0 0 0 8h4"/>',
     paint: '<path d="M5 9a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v1H5z"/><path d="M12 10v6"/><rect x="10" y="16" width="4" height="5" rx="1"/>',
+    /* Tacho de basura: tapa, asa, cuerpo y dos ranuras. Se usa para eliminar. */
+    trash: '<path d="M4 7h16"/><path d="M9.6 7V5.4A1.4 1.4 0 0 1 11 4h2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.9 11.6a1.8 1.8 0 0 0 1.8 1.6h6.2a1.8 1.8 0 0 0 1.8-1.6L17.8 7"/><path d="M10.4 11v5.6"/><path d="M13.6 11v5.6"/>',
     /* Iconos del menu lateral */
     home: '<path d="M4 11.2 12 4l8 7.2"/><path d="M6 10v9.5h12V10"/><path d="M10 19.5v-5h4v5"/>',
     stack: '<path d="M8 3h9l-3 3.6"/><path d="M8 3 3 8.2l3 3.6"/><path d="M3 8.2v4.4l5 5 5-5V8.2"/><path d="M8 17.6v3.6l5 2.4 5-2.4v-3.6"/><path d="M13 17.6v3.6"/>',
