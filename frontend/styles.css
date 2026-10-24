@@ -579,9 +579,11 @@ body.show-ruler .canvas::before {
   font-size: 12pt;
   line-height: 1.15;
   /* las hojas horizontales son mas anchas que el area visible: se desplazan
-     horizontalmente en vez de quedar recortadas a la derecha */
-  overflow-x: auto;
-  overflow-y: visible;
+     horizontalmente en vez de quedar recortadas a la derecha. El scroll lo hace
+     el .canvas (overflow:auto): si #page tambien tuviera overflow, anidaria un
+     segundo scroller y la barra horizontal quedaria al final del documento y no
+     en el fondo de la zona visible. */
+  overflow: visible;
 }
 /* marca visible para las hojas horizontales, que de otro modo se confunden
    con las verticales cuando la ventana es estrecha. El tamano lo pone el
