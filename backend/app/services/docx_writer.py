@@ -11,6 +11,9 @@ import io
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt
+from docx.text.paragraph import Paragraph
+
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 # Reglas que sabemos aplicar de forma permanente en el .docx
 RULE_FORMATTERS = {
@@ -28,6 +31,21 @@ RULE_FORMATTERS = {
 }
 
 
+def _iter_body_paragraphs(doc):
+    """Parrafos del cuerpo en orden, incluidas las celdas de tablas.
+
+    `doc.paragraphs` solo recorre los parrafos de nivel superior: el texto de
+    una tabla (por ejemplo la matriz de consistencia) se saltaba al aplicar
+    correcciones, asi que la edicion quedaria sin formato en esas celdas.
+    """
+    for child in doc.element.body.iterchildren():
+        if child.tag == W_NS + "p":
+            yield Paragraph(child, doc)
+        elif child.tag == W_NS + "tbl":
+            for p in child.iter(W_NS + "p"):
+                yield Paragraph(p, doc)
+
+
 def apply_corrections(docx_bytes: bytes, rule_ids: list[str]) -> bytes:
     """Aplica las correcciones al .docx y devuelve los bytes del archivo resultante."""
     doc = Document(io.BytesIO(docx_bytes))
@@ -41,8 +59,8 @@ def apply_corrections(docx_bytes: bytes, rule_ids: list[str]) -> bytes:
     if not actions:
         return docx_bytes
 
-    # Formato por parrafo
-    for p in doc.paragraphs:
+    # Formato por parrafo (incluye las celdas de tablas, en orden de documento)
+    for p in _iter_body_paragraphs(doc):
         _apply_paragraph_rules(p, actions)
 
     # Margenes por seccion
@@ -136,7 +154,7 @@ def _apply_font_defaults(doc, actions: set[str]):
     if "tamano" in actions:
         font_size = Pt(12)
 
-    for p in doc.paragraphs:
+    for p in _iter_body_paragraphs(doc):
         for run in p.runs:
             if font_name and not _is_heading(p):
                 if not run.font.name or run.font.name not in {
@@ -169,7 +187,7 @@ def _is_heading(p) -> bool:
 
 def _apply_heading_format(doc):
     """Aplica formato APA a los encabezados: nivel 1 centrado+negrita, etc."""
-    for p in doc.paragraphs:
+    for p in _iter_body_paragraphs(doc):
         if not p.style:
             continue
         name = (p.style.name or "").lower()
