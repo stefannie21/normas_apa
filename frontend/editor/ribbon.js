@@ -127,6 +127,7 @@ const Ribbon = (function () {
           label: "Vistas",
           controls: [
             { type: "action", action: "reading", icon: "eye", label: "Modo lectura", big: true },
+            { type: "action", action: "pdf-view", icon: "docs", label: "Vista PDF", big: true },
           ],
         },
         {

@@ -182,6 +182,7 @@ en la página, como el editor en `correcciones.js`.
 | `GET` | `/rules` | Catálogo de reglas activas |
 | `POST` | `/api/analyze` | Analiza un `.docx` y devuelve el informe |
 | `POST` | `/api/docx-meta` | Geometría y formato de las secciones |
+| `POST` | `/api/docx-pdf` | Vista fiel en PDF (conversión con Word) |
 | `POST` | `/api/report/docx` | Informe APA como `.docx` descargable |
 | `POST` | `/api/export` | `.docx` corregido con los IDs de reglas aplicados |
 | `POST` | `/api/ai/classify` | Segunda opinión por IA (solo lectura) |

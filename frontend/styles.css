@@ -1553,3 +1553,41 @@ body.reading #page { cursor: default; }
   .rcolor-icn { width: 18px; }
   .ribbon-group-label { display: none; }
 }
+
+/* ---------- Vista PDF fiel (Word) ---------- */
+#pdf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  background: #23272e;
+}
+.pdf-overlay-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #2f3542;
+  color: #f4f6f8;
+  font: 500 13px/1.2 "Segoe UI", system-ui, sans-serif;
+}
+.pdf-overlay-bar button {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 14px;
+  background: #4f7cff;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.pdf-overlay-bar button:hover {
+  background: #3f6bea;
+}
+#pdf-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #525659;
+}

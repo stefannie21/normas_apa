@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
-from backend.app.services import ai_filter, ai_reviewer, report
+from backend.app.services import ai_filter, ai_reviewer, pdf_service, report
 from backend.app.services.analyzer import analyze
 from backend.app.services.docx_parser import (
     empty_paragraph_marks,
@@ -419,6 +419,26 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
             status_code=422, detail=f"No se pudo leer el documento: {exc}"
         ) from exc
     return JSONResponse(payload)
+
+
+@router.post("/docx-pdf")
+def docx_pdf_endpoint(file: UploadFile = File(...)) -> Response:
+    """Convierte el .docx a PDF con Word para una vista fiel (sin desformar)."""
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .docx")
+    data = _read_upload(file, get_settings())
+    try:
+        pdf_bytes = pdf_service.convert_docx_to_pdf(data)
+    except pdf_service.PdfConversionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline; filename=documento.pdf",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("/analyze")

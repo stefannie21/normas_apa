@@ -73,6 +73,7 @@ const App = (function () {
     image: pickImage,
     link: insertLink,
     reading: toggleReading,
+    "pdf-view": togglePdfView,
     "apa-defaults": applyApaDefaults,
     repaginate: repaginate,
     "toggle-ruler": () => document.body.classList.toggle("show-ruler"),
@@ -402,6 +403,57 @@ const App = (function () {
     page.contentEditable = reading ? "false" : "true";
     document.body.classList.toggle("reading", reading);
     showToast(reading ? "Modo lectura activado" : "Edición activada", "ok");
+  }
+
+  // Vista PDF fiel: Word convierte el .docx y se muestra el PDF en una capa.
+  // Sirve para comprobar que el contenido no se mueve respecto al archivo
+  // original. La edicion y las marcas siguen en el visor HTML.
+  async function togglePdfView() {
+    const existing = document.getElementById("pdf-overlay");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    if (!currentFile) {
+      showToast("Primero abre un documento .docx", "error");
+      return;
+    }
+    showToast("Generando vista PDF con Word...", "ok");
+    try {
+      const data = new FormData();
+      data.append("file", currentFile, currentFile.name);
+      const res = await fetch("/api/docx-pdf", { method: "POST", body: data });
+      if (!res.ok) {
+        let detail = "No se pudo generar el PDF.";
+        try {
+          const j = await res.json();
+          if (j && j.detail) detail = j.detail;
+        } catch (e) {
+          /* respuesta sin JSON */
+        }
+        showToast(detail, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const overlay = document.createElement("div");
+      overlay.id = "pdf-overlay";
+      overlay.innerHTML =
+        '<div class="pdf-overlay-bar">' +
+        '<span>Vista PDF (Word)</span>' +
+        '<button type="button" id="pdf-close" title="Cerrar">Cerrar</button>' +
+        "</div>" +
+        '<iframe id="pdf-frame" title="Vista PDF del documento"></iframe>';
+      document.body.appendChild(overlay);
+      const frame = overlay.querySelector("#pdf-frame");
+      frame.src = url;
+      frame.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+      overlay.querySelector("#pdf-close").addEventListener("click", () => {
+        overlay.remove();
+      });
+    } catch (e) {
+      showToast("No se pudo generar la vista PDF.", "error");
+    }
   }
 
   function repaginate() {
