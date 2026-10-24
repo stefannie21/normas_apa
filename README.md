@@ -146,7 +146,6 @@ frontend/
   sidebar.js             Menú lateral (plegado y despliegue)
   vendor/                mammoth.browser.min.js (docx -> HTML, local)
 tests/                   Pruebas y generadores de documentos de muestra
-inf/                     Documentación de trabajo del proyecto
 ```
 
 ### Añadir una sección
