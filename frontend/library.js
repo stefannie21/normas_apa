@@ -82,7 +82,8 @@ async function list() {
 }
 
 // Da de alta el archivo (o actualiza el ya existente con el MISMO nombre, que
-// es el caso normal al reabrir una tesis).
+// es el caso normal al reabrir una tesis). El ultimo informe se conserva: el
+// usuario debe poder volver a leerlo sin gastar una nueva verificacion.
 async function record(file) {
   const prev = await LibraryStore.listTheses();
   const same = prev.find((r) => r.name === file.name);
@@ -95,26 +96,41 @@ async function record(file) {
     ext: fileExt(file.name),
     blob: file,
     addedAt: same ? same.addedAt : new Date().toISOString(),
-    // al reabrir un documento sin verificar, vuelve a quedar pendiente
-    status: "pendiente",
-    score: null,
-    analyzedAt: null,
+    // lo que ya se habia verificado sigue vigente hasta la proxima verificacion
+    status: (same && same.status) || "pendiente",
+    score: same && same.score != null ? same.score : null,
+    analyzedAt: (same && same.analyzedAt) || null,
+    report: (same && same.report) || null,
   };
   await LibraryStore.upsertThesis(rec);
   return rec;
 }
 
-// El analisis es lo unico que hoy define el estado de una tesis.
-async function syncAnalysis(summary, fileName) {
+// El analisis es lo unico que hoy define el estado de una tesis. Se guarda
+// tambien el informe completo para poder reabrirlo sin volver a analizar.
+async function syncAnalysis(summary, fileName, report) {
   if (!fileName) return null;
   const rows = await LibraryStore.listTheses();
   const rec = rows.find((r) => r.name === fileName);
   if (!rec) return null;
   rec.status = statusFromAnalysis(summary);
   rec.score = summary && summary.compliance_score != null ? summary.compliance_score : null;
-  rec.analyzedAt = new Date().toISOString();
+  rec.analyzedAt = (report && report.generatedAt) || new Date().toISOString();
+  if (report) rec.report = report;
   await LibraryStore.upsertThesis(rec);
   return rec;
+}
+
+// Ultimo informe guardado de un documento (o null si nunca se verifico).
+async function getReport(fileName) {
+  if (!fileName) return null;
+  try {
+    const rows = await LibraryStore.listTheses();
+    const rec = rows.find((r) => r.name === fileName);
+    return rec && rec.report ? rec.report : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function remove(id) {
@@ -133,5 +149,6 @@ export const Library = {
   list,
   record,
   syncAnalysis,
+  getReport,
   remove,
 };

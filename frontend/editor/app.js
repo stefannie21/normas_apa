@@ -373,7 +373,7 @@ const App = (function () {
           { transformDocument: keepEmptyParagraphs }
         )
         .then((result) => enrichHtml(result.value || "<p></p>"))
-        .then((html) => {
+        .then(async (html) => {
           page.innerHTML = html;
           buildIndex();
           Pager.paginate(page, docSections);
@@ -386,9 +386,18 @@ const App = (function () {
           clearMarks();
           resetReport();
           updateCounts();
+          // Si esta tesis ya se habia verificado, se recupera su ultimo informe:
+          // se puede leer al abrir sin volver a gastar una verificacion.
+          const previo = await Library.getReport(file.name);
+          const restaurado = restoreReportState(previo, true);
           // el documento que se acaba de abrir es el punto de partida
           History.reset();
-          showToast("Documento cargado. Edita y pulsa 'Verificar APA'.", "ok");
+          showToast(
+            restaurado
+              ? "Documento cargado con su ultimo informe guardado."
+              : "Documento cargado. Edita y pulsa 'Verificar APA'.",
+            "ok"
+          );
           // guardar la sesion automaticamente para que al recargar la web
           // se restaure ESTE documento y no el anterior
           saveSession(true);
@@ -596,9 +605,11 @@ const App = (function () {
         return;
       }
       aiFindings = payload.findings || [];
-      if (!lastFindings.length) runAnalysisQuiet();
+      if (!lastFindings.length) await runAnalysisQuiet();
       renderReport({ summary: lastSummary, findings: lastFindings.concat(aiFindings) });
       openReportes();
+      // el resultado con IA tambien queda guardado hasta la proxima verificacion
+      persistReport();
       (payload.notes || []).forEach((n) => showToast(n, "info"));
       statusMsg.textContent = "";
       showToast(
@@ -754,9 +765,9 @@ const App = (function () {
       renderReport(report);
       // el recuadro del informe aparece junto al documento
       openPane();
-      Library.syncAnalysis(report.summary, currentFile && currentFile.name).catch(() => {
-        /* sin biblioteca no se rompe nada */
-      });
+      // se guarda el informe en la sesion: al reiniciar se vuelve a mostrar
+      // este mismo resultado y no hay que volver a verificar
+      persistReport();
       statusMsg.textContent = "";
       const total = (report.summary && report.summary.total_findings) || (report.findings || []).length;
       showToast("Informe generado: " + total + " hallazgos.", "ok");
@@ -973,6 +984,48 @@ const App = (function () {
     });
   }
 
+  // Copia serializable del informe: viaja en la sesion y en la biblioteca para
+  // que al reiniciar se pueda mostrar de nuevo sin volver a verificar.
+  function reportSnapshot() {
+    return {
+      summary: lastSummary,
+      findings: allFindings.slice(),
+      resolved: Array.from(resolvedIdx),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // Guarda el informe vigente en la sesion y en la biblioteca. Se llama al
+  // verificar, al revisar con IA y al corregir avisos: el estado queda
+  // disponible tras reiniciar sin volver a gastar la verificacion.
+  function persistReport() {
+    if (!currentFile) return;
+    saveSession(true);
+    Library.syncAnalysis(lastSummary, currentFile.name, reportSnapshot()).catch(() => {
+      /* sin biblioteca no se rompe nada */
+    });
+  }
+
+  // Vuelve a poner en pantalla un informe ya generado. `quiet` evita los avisos
+  // de "texto marcado" al restaurar (no es una accion del usuario).
+  function restoreReportState(data, quiet) {
+    if (!data) return false;
+    const summary = data.summary || null;
+    const findings = Array.isArray(data.findings) ? data.findings : [];
+    if (!summary && !findings.length) return false;
+    lastSummary = summary;
+    allFindings = findings;
+    lastFindings = allFindings;
+    resolvedIdx.clear();
+    (Array.isArray(data.resolved) ? data.resolved : []).forEach((i) => resolvedIdx.add(i));
+    refreshCurrentFindings();
+    markInDocument(quiet);
+    updateCounts();
+    if (reportPane && !reportPane.hidden) renderPane();
+    notifyChange();
+    return true;
+  }
+
   function renderReport(report) {
     const s = report.summary || {};
     lastSummary = s;
@@ -993,7 +1046,7 @@ const App = (function () {
   /* ---------- Senalar los problemas dentro del texto ---------- */
   let marksVisible = true;
 
-  function markInDocument() {
+  function markInDocument(quiet) {
     if (!marksVisible) return;
     if (page.hidden || !currentFindings.length) {
       Marker.clear();
@@ -1001,14 +1054,16 @@ const App = (function () {
     }
     const res = Marker.apply(currentFindings);
     if (res.marks || res.blocks) {
-      showToast(
-        (res.marks ? res.marks + " texto(s) marcados" : "") +
-          (res.blocks ? " y " + res.blocks + " párrafo(s)" : "") +
-          " en el documento",
-        "info"
-      );
+      if (!quiet) {
+        showToast(
+          (res.marks ? res.marks + " texto(s) marcados" : "") +
+            (res.blocks ? " y " + res.blocks + " párrafo(s)" : "") +
+            " en el documento",
+          "info"
+        );
+      }
     }
-    if (res.unmatched) {
+    if (res.unmatched && !quiet) {
       showToast(
         res.unmatched + " aviso(s) no se pudieron ubicar en el texto",
         "info"
@@ -1559,6 +1614,9 @@ const App = (function () {
       // version del conversor que produjo `flow`: permite saber si la sesion
       // guardada se puede reutilizar o hay que reconvertir el .docx
       flowVersion: FLOW_VERSION,
+      // ultimo informe: se conserva para poder leerlo al reiniciar sin gastar
+      // otra verificacion (ni tokens de IA). Se reemplaza al verificar de nuevo.
+      report: reportSnapshot(),
       savedAt: new Date().toISOString(),
     };
     try {
@@ -1742,6 +1800,9 @@ const App = (function () {
       emptyState.hidden = true;
       page.hidden = false;
       resetReport();
+      // El informe de la ultima verificacion se conserva hasta que se vuelva a
+      // verificar: asi se puede leer al reiniciar sin gastar otra verificacion.
+      restoreReportState(doc.report, true);
       updateCounts();
       markDirty(false);
       lastSavedAt = doc.savedAt || "";
@@ -1987,6 +2048,8 @@ const App = (function () {
     }
     const quedan = allFindings.length - resolvedIdx.size;
     renderReport({ summary: lastSummary, partial: true });
+    // los avisos resueltos tambien se guardan: al reiniciar siguen corregidos
+    persistReport();
     if (quedan) {
       setTimeout(function () {
         showToast("Quedan " + quedan + " aviso(s) por revisar manualmente.", "info");
@@ -2005,6 +2068,7 @@ const App = (function () {
     // al deshacer vuelven a aparecer los avisos corregidos
     resolvedIdx.clear();
     renderReport({ summary: lastSummary, partial: true });
+    persistReport();
   }
 
   fixApply.addEventListener("click", applyFixes);
