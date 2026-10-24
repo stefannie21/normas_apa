@@ -145,8 +145,19 @@ def _apply_font_defaults(doc, actions: set[str]):
                 }:
                     run.font.name = font_name
             if font_size and not _is_heading(p):
-                if run.font.size and run.font.size.pt not in {10.0, 11.0, 12.0}:
+                # `run.font.size` puede ser None (heredado del estilo): en ese
+                # caso hay que asignarlo igual, si no el tamano nunca cambia.
+                if run.font.size is None or run.font.size.pt not in {10.0, 11.0, 12.0}:
                     run.font.size = font_size
+
+    # El estilo Normal hereda a los parrafos sin formato explicito: sin esto
+    # un documento con fuente/tamano "heredados" no se corrige del todo.
+    if font_name or font_size:
+        normal = doc.styles["Normal"]
+        if font_name:
+            normal.font.name = font_name
+        if font_size:
+            normal.font.size = font_size
 
 
 def _is_heading(p) -> bool:

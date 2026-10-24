@@ -39,6 +39,21 @@ def check_formato() -> None:
     assert report["summary"]["total_findings"] == len(result.findings)
     assert "Informe de cumplimiento" in render_html(report)
 
+    # Formato del documento corregido: fuente y tamano por defecto deben
+    # aplicarse en todo el documento, no solo donde habia un hallazgo.
+    from backend.app.services.docx_writer import apply_corrections
+
+    corrected = apply_corrections(
+        build_sample(),
+        [
+            "FORMAT-001", "FORMAT-002", "FORMAT-003", "FORMAT-004", "FORMAT-005",
+            "FORMAT-006", "FORMAT-007", "HEAD-002", "CIT-003", "CIT-002", "REF-002",
+        ],
+    )
+    fixed = parse_docx(corrected, "sample_corregido.docx")
+    assert fixed.default_font == "Times New Roman", f"Fuente por defecto: {fixed.default_font}"
+    assert fixed.default_font_size_pt == 12.0, f"Tamano por defecto: {fixed.default_font_size_pt}"
+
     print(f"[formato]   {document.filename}")
     print(f"            {result.summary['total_findings']} hallazgos, "
           f"cumplimiento {result.summary['compliance_score']}%")
