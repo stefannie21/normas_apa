@@ -28,6 +28,20 @@ const App = (function () {
   const fileInput = document.getElementById("file");
   const docName = document.getElementById("doc-name");
   const analyzeBtn = document.getElementById("analyze-btn");
+
+  /* ---------- Barra de acciones rápida ---------- */
+  function isEditDocument() {
+    return Router.current() === "correcciones";
+  }
+
+  function updateQuickActions() {
+    if (quickActions) {
+      // `[hidden]` se aplica con !important en styles.css, así que no se ve
+      // afectado por el `display: flex` que tiene `.titlebar-right`.
+      quickActions.hidden = !isEditDocument();
+    }
+  }
+  const quickActions = document.getElementById("quick-actions");
   const emptyOpen = document.getElementById("empty-open");
   const statusMsg = document.getElementById("status-msg");
   const statusWords = document.getElementById("status-words");
@@ -2144,6 +2158,10 @@ const App = (function () {
   } catch (e) {
     /* sin persistencia */
   }
+
+  // La barra de acciones rápida solo se muestra cuando estamos en "Editar documento".
+  updateQuickActions();
+  document.addEventListener("routechange", () => updateQuickActions());
 
   return api;
 })();

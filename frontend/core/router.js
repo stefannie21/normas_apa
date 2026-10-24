@@ -42,6 +42,10 @@ function setShell(show) {
   if (ribbon) ribbon.hidden = !show;
   if (ws) ws.hidden = !show;
   if (bar) bar.hidden = !show;
+
+  // La barra azul con el nombre del documento solo se muestra en el editor.
+  const titlebar = document.querySelector(".titlebar");
+  if (titlebar) titlebar.hidden = !show;
 }
 
 function go(name) {
@@ -53,6 +57,7 @@ function go(name) {
 
   current = name;
   syncNav(name);
+  document.dispatchEvent(new CustomEvent("routechange", { detail: { name } }));
   document.title = (spec.title ? spec.title + " · " : "") + "CeaTesis";
 
   if (spec.shell) {
