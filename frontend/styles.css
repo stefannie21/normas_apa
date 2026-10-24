@@ -544,6 +544,10 @@ body {
   padding: 0;
   display: block;
 }
+/* Fuera de la edicion (modo lectura) no se muestra la barra: el documento
+   puede desbordarse, pero sin barra visible. En edicion aparece al desbordar. */
+.canvas.no-scrollbar { overflow-x: auto; overflow-y: auto; scrollbar-width: none; }
+.canvas.no-scrollbar::-webkit-scrollbar { display: none; }
 .canvas.dragging { outline: 3px dashed var(--accent); outline-offset: -8px; }
 /* Regla: solo era un espacio vacio de 44px. Ahora es una regla real. */
 body.show-ruler .canvas { position: relative; }

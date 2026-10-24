@@ -411,6 +411,9 @@ const App = (function () {
     reading = !reading;
     page.contentEditable = reading ? "false" : "true";
     document.body.classList.toggle("reading", reading);
+    // Fuera de la edicion no se muestra la barra horizontal del visor: el
+    // documento puede desbordarse, pero sin barra visible.
+    canvas.classList.toggle("no-scrollbar", reading);
     showToast(reading ? "Modo lectura activado" : "Edición activada", "ok");
   }
 
