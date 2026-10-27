@@ -450,7 +450,15 @@ const Pager = (function () {
     const geoms = list.map(geom);
     const keyToSection = {};
     list.forEach((s, i) => {
-      if (s && s.first_key) keyToSection[s.first_key] = i;
+      if (s && s.first_key) {
+        // puede haber varias secciones con el mismo primer texto (p. ej. la
+        // portada repetida en un anexo horizontal): se guardan TODAS y al
+        // resolver se toma la primera que aun no ha empezado, como recorre
+        // Word. Antes la ultima pisaba a la primera y la portada real se
+        // pintaba con la hoja grande y horizontal del anexo.
+        if (!keyToSection[s.first_key]) keyToSection[s.first_key] = [];
+        keyToSection[s.first_key].push(i);
+      }
     });
 
     const m = getMeasurer(root);
@@ -478,7 +486,14 @@ const Pager = (function () {
       }
       let sec = sectionIndex;
       const k = textKey(unit);
-      if (k && keyToSection[k] !== undefined && keyToSection[k] >= sec) sec = keyToSection[k];
+      const cands = k ? keyToSection[k] : null;
+      if (cands) {
+        // la seccion mas temprana cuyo inicio todavia no se ha pasado: la
+        // portada inicial cae en su seccion real y la copia del anexo, que va
+        // al final, cambia a la seccion horizontal solo cuando le toca.
+        const nxt = cands.find((c) => c >= sec);
+        if (nxt !== undefined) sec = nxt;
+      }
       if (unit.dataset) unit.dataset.section = String(sec);
       return sec;
     }

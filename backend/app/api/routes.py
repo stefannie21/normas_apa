@@ -281,9 +281,13 @@ def _sections_meta(doc) -> list[dict]:
         if h <= 0:
             h = DEFAULT_PAGE_H_IN
 
-        landscape = orient == "landscape" or w > h
-        if landscape and w < h:
-            w, h = h, w
+        # Word decide la forma real de la hoja por las medidas (w vs h), no por
+        # el atributo orient: muchos .docx llevan orient="landscape" con
+        # medidas verticales y Word los pinta verticales. Antes el atributo
+        # forzaba hojas horizontales de meras proporciones verticales.
+        landscape = w > h
+        if not landscape and orient == "landscape":
+            orient = "portrait"
 
         pg_mar = sp.find(W + "pgMar")
         top = _twips_to_in(pg_mar.get(W + "top") if pg_mar is not None else None, 1.0)
