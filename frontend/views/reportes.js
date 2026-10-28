@@ -34,6 +34,17 @@ function contar(list) {
   return c;
 }
 
+function tarjeta(clase, icono, valor, texto, subtexto) {
+  return `<div class="rv-card ${clase}">
+      <span class="rv-card-icn">${icono}</span>
+      <div class="rv-card-info">
+        <div class="rv-card-num">${esc(valor)}</div>
+        <div class="rv-card-label">${esc(texto)}</div>
+        ${subtexto ? `<div class="rv-card-sub">${esc(subtexto)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
 function sinTildes(texto) {
   return String(texto || "")
     .normalize("NFKD")
@@ -228,6 +239,39 @@ function render() {
         <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
           title="Descargar el informe APA en un documento Word (.docx)"
           aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
+      </div>
+
+      <div class="rv-cards">
+        ${tarjeta("rv-card-score",
+          `<div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>`,
+          esc(score == null ? "--" : score),
+          "Nivel de cumplimiento",
+          score == null ? "Sin datos" : `Tu documento tiene un ${nivel(score).txt.toLowerCase()} avance.`
+        )}
+        ${tarjeta("rv-card-error",
+          `<span class="rv-sev-chip rv-sev-error">${icon("error")} Error</span>`,
+          cuentas.error || 0,
+          "Errores",
+          "Requieren corrección"
+        )}
+        ${tarjeta("rv-card-warning",
+          `<span class="rv-sev-chip rv-sev-warning">${icon("alert")} Aviso</span>`,
+          cuentas.warning || 0,
+          "Avisos",
+          "Revisar y validar"
+        )}
+        ${tarjeta("rv-card-info",
+          `<span class="rv-sev-chip rv-sev-info">${icon("info")} Observación</span>`,
+          cuentas.info || 0,
+          "Observaciones",
+          "Información adicional"
+        )}
+        ${tarjeta("rv-card-total",
+          icon("clipboard"),
+          cuentas.all || 0,
+          "Total de hallazgos",
+          "En todo el documento"
+        )}
       </div>
 
       <div class="rv-tablewrap">

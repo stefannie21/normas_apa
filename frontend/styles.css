@@ -2302,3 +2302,63 @@ body.reading #page { cursor: default; }
 .finding-side, .finding-cat, .finding-msg, .finding-excerpt, .finding-sug, .finding-page,
 .finding-sev, .finding-head, .rv-card, .rv-card-score, .score-ring, .rv-score-txt,
 .rv-score-title, .rv-level, .rv-card-icn, .rv-back { display: none !important; }
+
+/* ---------- Tarjetas de estadísticas (Reportes) ---------- */
+.rv-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 12px 18px 4px;
+}
+.rv-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: default;
+}
+.rv-card-icn {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 10px;
+  color: #fff; font-size: 1rem; font-weight: 700;
+}
+.rv-card-icn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
+.rv-card-info { min-width: 0; }
+.rv-card-num { font-size: 1.85rem; font-weight: 800; line-height: 1.1; color: var(--ink); }
+.rv-card-label { font-size: .82rem; color: var(--muted); margin-bottom: 2px; }
+.rv-card-sub { font-size: .76rem; color: #5b6673; }
+
+.rv-card-score {
+  align-items: flex-start;
+  padding: 16px;
+  flex-direction: column;
+  gap: 10px;
+}
+.rv-card-score .rv-card-icn { flex: 0 0 auto; }
+.score-ring {
+  width: 48px; height: 48px; flex: 0 0 48px;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), #e3e7ed 0);
+  display: grid; place-items: center;
+}
+.score-ring span { font-size: 1.05rem; font-weight: 800; color: var(--ink); }
+.score-ring small { font-size: .68rem; color: var(--muted); }
+
+.rv-card-error { border-color: #f6d9d4; background: #fdf1ef; }
+.rv-card-error .rv-card-icn { background: #f6d9d4; color: var(--error); }
+.rv-card-warning { border-color: #f6e4c2; background: #fdf8f0; }
+.rv-card-warning .rv-card-icn { background: #f6e4c2; color: #b9770e; }
+.rv-card-info { border-color: #d7e7f4; background: #eff6fb; }
+.rv-card-info .rv-card-icn { background: #d7e7f4; color: var(--info); }
+.rv-card-total { border-color: #e2d9f6; background: #f4f0fc; }
+.rv-card-total .rv-card-icn { background: #e2d9f6; color: #6b4fbb; }
+
+.rv-sev-chip { display: inline-flex; align-items: center; gap: 6px; }
+.rv-sev-chip.rv-sev-error { background: #fdecec; color: #c0392b; border: 1px solid #f5c6c6; }
+.rv-sev-chip.rv-sev-warning { background: #fdf7e9; color: #b9770e; border: 1px solid #f0ddad; }
+.rv-sev-chip.rv-sev-info { background: #eef4fb; color: #2f6f9f; border: 1px solid #c9dce9; }
+.rv-sev-chip [data-icon] svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
