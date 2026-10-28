@@ -14,6 +14,7 @@ const { esc, icon } = Dom;
 // que solo conviene mirar.
 const SEV_ICON = { error: "!", warning: "!", info: "i" };
 const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
+const SEV_COLOR = { error: "#e53e3e", warning: "#d69e2e", info: "#3182ce" };
 
 const POR_PAGINA = 10;
 
@@ -134,43 +135,35 @@ function paginacion(total, actual) {
 }
 
 function hallazgo(f, indice) {
-  const extra = f.extra || {};
-  const esIa = String(f.rule_id || "").startsWith("AI-");
-  const badge = esIa
-    ? `<span class="ai-badge" title="Sugerencia de la IA: no se aplica automaticamente">IA</span>`
-    : "";
-  const conf =
-    esIa && extra.ai_confidence != null
-      ? `<span class="ai-conf">confianza ${Math.round(extra.ai_confidence * 100)}%</span>`
-      : "";
-  const falta =
-    esIa && extra.ai_missing && extra.ai_missing.length
-      ? `<p class="finding-missing">Falta: ${esc(extra.ai_missing.join(" · "))}</p>`
-      : "";
+  const sev = f.severity || "info";
+  const color = SEV_COLOR[sev] || "#9aa5b1";
   const pag = String(f.location || "").match(/[Pp][áa]g\.?\s*([\d]+)/);
-  const chip = pag ? `Pág. ${esc(pag[1])}` : esc(f.location || "");
-  return `<article class="finding ${esc(f.severity)}${esIa ? " ai" : ""}" data-i="${indice}">
-      <div class="finding-rail">
-        <span class="dot">${SEV_ICON[f.severity] || ""}</span>
-        <span class="finding-sev">${SEV_TEXT[f.severity] || ""}</span>
-      </div>
-      <div class="finding-body">
-        <div class="finding-head">
-          <span class="finding-cat">${esc(f.category || "")}</span>
-          ${badge}${conf}
-          <span class="finding-rule">${esc(f.rule_id || "")}</span>
+  const ubic = pag ? `Pág. ${esc(pag[1])}` : esc(f.location || "");
+  const extra = f.extra || {};
+  const regla = esc(f.rule_id || "");
+  return `<tr class="rv-row rv-${sev}" data-i="${indice}">
+      <td class="rv-tipo">
+        <span class="rv-sev-dot" style="background:${color}"></span>
+        <span class="rv-sev-label">${SEV_TEXT[sev]}</span>
+      </td>
+      <td class="rv-desc">
+        <div class="rv-desc-titulo">${esc(f.category || "")} · ${regla}</div>
+        <div class="rv-desc-texto">${esc(f.message || "")}</div>
+        ${f.excerpt ? `<div class="rv-excerpt">"${esc(f.excerpt)}"</div>` : ""}
+      </td>
+      <td class="rv-ubi">${esc(ubic)}</td>
+      <td class="rv-prio">
+        <span class="rv-prio-chip rv-prio-${sev}">${SEV_TEXT[sev]}</span>
+      </td>
+      <td class="rv-acc">
+        <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver">${icon("eye")}</button>
+        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Más">${icon("more")}</button>
+        <div class="rv-more-pop" id="rv-pop-${indice}" hidden>
+          <button class="rv-pop-item" data-act="corregir" data-i="${indice}">${icon("fix")} Corregir</button>
+          <button class="rv-pop-item" data-act="descartar" data-i="${indice}">${icon("xCircle")} Descartar</button>
         </div>
-        <p class="finding-msg">${esc(f.message || "")}</p>
-        ${falta}
-        ${f.excerpt ? `<p class="finding-excerpt">"${esc(f.excerpt)}"</p>` : ""}
-        ${
-          f.suggestion
-            ? `<p class="finding-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> ${esc(f.suggestion)}</p>`
-            : ""
-        }
-      </div>
-      <div class="finding-side">${chip ? `<span class="finding-page">${chip}</span>` : ""}</div>
-    </article>`;
+      </td>
+    </tr>`;
 }
 
 function render() {
@@ -190,37 +183,26 @@ function render() {
   const desde = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrada.slice(desde, desde + POR_PAGINA);
 
-  const filtros = [
-    ["all", "Todos"],
-    ["error", "Errores"],
-    ["warning", "Avisos"],
-    ["info", "Observ."],
+  // chips de estado en el header
+  const chips = [
+    ["all", "Todos", cuentas.all || 0, "var(--accent)"],
+    ["error", "Errores", cuentas.error || 0, "var(--error)"],
+    ["warning", "Avisos", cuentas.warning || 0, "var(--warning)"],
+    ["info", "Observaciones", cuentas.info || 0, "var(--info)"],
   ]
     .map(
-      ([k, texto]) =>
-        `<button data-filter="${k}" class="${filtro === k ? "active" : ""}">${texto} <b>${cuentas[k] || 0}</b></button>`
+      ([k, texto, n, col]) =>
+        `<button data-filter="${k}" class="rv-chip ${filtro === k ? "active" : ""}" style="--c:${col}">
+          ${texto} <b>${n}</b>
+        </button>`
     )
     .join("");
 
-  // chips de categoria (se despliegan con el boton Filtros)
-  const cats = contarCategorias(lista);
-  const catChips = cats.length
-    ? `<div class="rv-cats">
-        <button data-cat="" class="${categoria ? "" : "active"}">Todas <b>${lista.length}</b></button>
-        ${cats
-          .map(
-            ([c, n]) =>
-              `<button data-cat="${esc(c)}" class="${categoria === c ? "active" : ""}">${esc(c)} <b>${n}</b></button>`
-          )
-          .join("")}
-      </div>`
-    : "";
-
   const cuerpo = !st.ready
-    ? `<p class="empty-pane">Aún no se ha verificado el documento.</p>`
+    ? `<tr><td colspan="5" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
     : enPagina.length
       ? enPagina.map((f) => hallazgo(f, lista.indexOf(f))).join("")
-      : `<p class="empty-pane">Sin hallazgos con estos filtros.</p>`;
+      : `<tr><td colspan="5" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
 
   const pie = st.ready
     ? `<div class="rv-foot">
@@ -239,41 +221,56 @@ function render() {
           <h1>Reportes</h1>
           <p>Resumen del cumplimiento y el detalle de los hallazgos del documento.</p>
         </div>
-        <button class="rv-back" data-act="volver">Volver al documento</button>
-        <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
-          title="Descargar el informe APA en un documento Word (.docx)"
-          aria-label="Descargar el informe APA en Word">${icon("download")}</button>
+        <div class="rv-head-acc">
+          <div class="rv-header-chips">${chips}</div>
+          <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
+            title="Descargar el informe APA en un documento Word (.docx)"
+            aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
+        </div>
       </div>
 
       <div class="pane-body">
-        <div class="rv-cards">
-          <div class="rv-card rv-card-score">
-            <div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>
-            <div class="rv-score-txt">
-              <div class="rv-score-title">Nivel de cumplimiento</div>
-              <span class="rv-level ${nivelTxt.clase}">${esc(nivelTxt.txt)}</span>
-            </div>
-          </div>
-          ${tarjeta("error", "✕", cuentas.error || 0, "Errores")}
-          ${tarjeta("warning", "!", cuentas.warning || 0, "Avisos")}
-          ${tarjeta("info", "i", cuentas.info || 0, "Observaciones")}
-          ${tarjeta("total", icon("clipboard"), cuentas.all || 0, "Total de hallazgos")}
-        </div>
-
         <div class="rv-toolbar">
-          <div class="pane-filters">${filtros}</div>
           <div class="rv-search-wrap">
             <span class="rv-search-icn">${icon("search")}</span>
-            <input class="rv-search" type="search" placeholder="Buscar en los hallazgos..."
+            <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
               value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
           </div>
-          <button class="rv-filters-btn ${categoria ? "active" : ""}" data-act="filtros"
-            aria-expanded="${categoria ? "true" : "false"}">${icon("filter")}<span>Filtros</span></button>
+          <div class="rv-select-wrap">
+            <label class="rv-select-lbl">Tipo de hallazgo</label>
+            <select id="rv-tipo" aria-label="Tipo de hallazgo">
+              <option value="">Todos</option>
+              <option value="error">Error</option>
+              <option value="warning">Aviso</option>
+              <option value="info">Observación</option>
+            </select>
+          </div>
+          <div class="rv-select-wrap">
+            <label class="rv-select-lbl">Prioridad</label>
+            <select id="rv-prioridad" aria-label="Prioridad">
+              <option value="">Todas</option>
+              <option value="error">Alta</option>
+              <option value="warning">Media</option>
+              <option value="info">Baja</option>
+            </select>
+          </div>
+          <button class="rv-btn-limpiar" data-act="limpiar">${icon("xCircle")} Limpiar filtros</button>
         </div>
 
-        ${catChips ? `<div class="rv-catbar" ${categoria ? "" : "hidden"}>${catChips}</div>` : ""}
-
-        <div class="findings">${cuerpo}</div>
+        <div class="rv-tablewrap">
+          <table class="rv-table">
+            <thead>
+              <tr>
+                <th scope="col">Tipo</th>
+                <th scope="col">Descripción del hallazgo</th>
+                <th scope="col">Ubicación</th>
+                <th scope="col">Prioridad</th>
+                <th scope="col" class="rv-acc-col">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="rv-body">${cuerpo}</tbody>
+          </table>
+        </div>
         ${pie}
       </div>
     </div>`;
@@ -296,7 +293,8 @@ function mount(el) {
       : null
   );
 
-  el.querySelectorAll(".pane-filters [data-filter]").forEach((b) =>
+  // chips de severidad del header
+  el.querySelectorAll(".rv-chip[data-filter]").forEach((b) =>
     b.addEventListener("click", () => {
       filtro = b.dataset.filter;
       pagina = 1;
@@ -304,14 +302,54 @@ function mount(el) {
     })
   );
 
-  el.querySelectorAll(".rv-cats [data-cat]").forEach((b) =>
+  // buscador
+  const busquedaEl = el.querySelector(".rv-search");
+  if (busquedaEl) {
+    busquedaEl.addEventListener("input", (e) => {
+      busqueda = e.target.value;
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // filtro tipo de hallazgo
+  const tipoEl = el.querySelector("#rv-tipo");
+  if (tipoEl) {
+    tipoEl.addEventListener("change", (e) => {
+      filtro = e.target.value || "all";
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // filtro prioridad (mapea a severidad)
+  const prioEl = el.querySelector("#rv-prioridad");
+  if (prioEl) {
+    prioEl.addEventListener("change", (e) => {
+      const v = e.target.value;
+      filtro = v || "all";
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // limpiar filtros
+  el.querySelectorAll("[data-act=limpiar]").forEach((b) =>
     b.addEventListener("click", () => {
-      categoria = b.dataset.cat || "";
+      filtro = "all";
+      busqueda = "";
+      const inp = el.querySelector(".rv-search");
+      if (inp) inp.value = "";
+      const t = el.querySelector("#rv-tipo");
+      if (t) t.value = "";
+      const p = el.querySelector("#rv-prioridad");
+      if (p) p.value = "";
       pagina = 1;
       pintar();
     })
   );
 
+  // paginacion
   el.querySelectorAll(".rv-pages [data-pag]").forEach((b) =>
     b.addEventListener("click", () => {
       const n = Number(b.dataset.pag);
@@ -323,39 +361,57 @@ function mount(el) {
     })
   );
 
-  const busquedaEl = el.querySelector(".rv-search");
-  if (busquedaEl) {
-    busquedaEl.addEventListener("input", (e) => {
-      busqueda = e.target.value;
-      pagina = 1;
-      pintar();
-    });
-  }
-
-  el.querySelectorAll(".findings .finding").forEach((art) =>
-    art.addEventListener("click", () => {
+  // acciones de filas: ver / mas
+  el.querySelectorAll(".rv-iconbtn[data-act]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = Number(b.dataset.i);
       const lista = estado().findings || [];
-      if (app && app.jumpToFinding) app.jumpToFinding(lista[Number(art.dataset.i)]);
+      const f = lista[i];
+      if (!f) return;
+      if (b.dataset.act === "ver") {
+        if (app && app.jumpToFinding) app.jumpToFinding(f);
+      } else if (b.dataset.act === "mas") {
+        const pop = el.querySelector(`#rv-pop-${i}`);
+        document.querySelectorAll(".rv-more-pop").forEach((m) => m.hidden = true);
+        if (pop) pop.hidden = !pop.hidden;
+      }
     })
   );
 
-  el.querySelectorAll("[data-act]").forEach((b) =>
+  // items del menu mas
+  el.querySelectorAll(".rv-pop-item[data-act]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = Number(b.dataset.i);
+      const lista = estado().findings || [];
+      const f = lista[i];
+      if (!f) return;
+      if (b.dataset.act === "corregir") {
+        if (app && app.openFixModal) app.openFixModal();
+        // TODO: pre-seleccionar el hallazgo en el modal de correccion
+      } else if (b.dataset.act === "descartar") {
+        // TODO: descartar hallazgo (marcar como resuelto)
+        if (app && app.toast) app.toast("Hallazgo descartado", "ok");
+        document.getElementById(`rv-pop-${i}`).hidden = true;
+      }
+    })
+  );
+
+  // cerrar pop al hacer click fuera
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".rv-more-pop").forEach((m) => m.hidden = true);
+  });
+
+  // acciones globales
+  el.querySelectorAll("[data-act]").forEach((b) => {
+    if (b.closest(".rv-iconbtn, .rv-pop-item")) return; // ya manejados arriba
     b.addEventListener("click", () => {
       const act = b.dataset.act;
       if (act === "volver") Router.go("correcciones");
       else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
-      else if (act === "filtros") {
-        const barra = el.querySelector(".rv-catbar");
-        if (barra) {
-          const visible = barra.hasAttribute("hidden");
-          if (visible) barra.removeAttribute("hidden");
-          else barra.setAttribute("hidden", "");
-          b.classList.toggle("active", visible);
-          b.setAttribute("aria-expanded", visible ? "true" : "false");
-        }
-      }
     })
-  );
+  });
 }
 
 // Repinta sin perder la posicion del scroll: el editor avisa de cada cambio.
