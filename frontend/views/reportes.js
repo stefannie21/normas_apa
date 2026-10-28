@@ -12,7 +12,9 @@ const { esc, icon } = Dom;
 
 const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
 const SEV_COLOR = { error: "#e53e3e", warning: "#d69e2e", info: "#3182ce" };
-const SEV_ICON = { error: "error", warning: "alert", info: "info" };
+const SEV_ICON = { error: "xCircle", warning: "alert", info: "infoCircle" };
+// la gravedad se muestra como prioridad, igual que en el filtro "Prioridad"
+const SEV_PRIO = { error: "Alta", warning: "Media", info: "Baja" };
 
 const POR_PAGINA = 6;
 
@@ -96,59 +98,68 @@ function paginacion(total, actual) {
     </div>`;
 }
 
+/* Etiqueta de gravedad: circulo relleno con el simbolo en blanco + nombre. */
 function sevChip(sev) {
-  const color = SEV_COLOR[sev] || "#9aa5b1";
-  const label = SEV_TEXT[sev] || sev;
-  const svgName = SEV_ICON[sev] || "info";
-  return `<span class="rv-sev-chip" style="--c:${color}">${icon(svgName)} ${esc(label)}</span>`;
+  const k = SEV_TEXT[sev] ? sev : "info";
+  return `<span class="rv-sev-chip rv-sev-${k}">
+      <span class="rv-sev-ico">${icon(SEV_ICON[k])}</span>${esc(SEV_TEXT[k])}
+    </span>`;
+}
+
+/* "Párrafo 14" / "Pág. 3": el backend manda una sola cadena
+   ("Párrafo 14", "Página 3 (párrafo 14)", "Sección 2"), aqui se parte en las
+   dos lineas de la columna Ubicacion. */
+function ubicacion(location) {
+  const loc = String(location || "").trim();
+  const pag = loc.match(/P[áa]gina\s*(\d+)/i);
+  const par = loc.match(/p[áa]rrafo\s*(\d+)/i);
+  const sec = loc.match(/secci[óo]n\s*(\d+)/i);
+  const principal = par
+    ? "Párrafo " + par[1]
+    : sec
+      ? "Sección " + sec[1]
+      : loc || "—";
+  return { principal, secundario: pag ? "Pág. " + pag[1] : "" };
 }
 
 function filaHallazgo(f, indice) {
-  const sev = f.severity || "info";
-  const color = SEV_COLOR[sev] || "#9aa5b1";
+  const sev = SEV_TEXT[f.severity] ? f.severity : "info";
   const regla = esc(f.rule_id || "");
-  const categoriaTexto = esc(f.category || "");
+  const categoriaTexto = esc(f.category || "Hallazgo");
   const mensaje = esc(f.message || "");
   const excerpt = f.excerpt ? `<div class="rv-excerpt">"${esc(f.excerpt)}"</div>` : "";
   const sugerencia = f.suggestion
-    ? `<div class="rv-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> ${esc(f.suggestion)}</div>`
+    ? `<div class="rv-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> <span>${esc(f.suggestion)}</span></div>`
     : "";
-  const pag = String(f.location || "").match(/[Pp][áa]g\.?\s*([\d]+)/);
-  const ubic = pag ? `Párrafo ${esc(pag[1])}` : esc(f.location || "");
+  const ubic = ubicacion(f.location);
 
   return `<tr class="rv-row rv-${sev}" data-i="${indice}">
       <td class="rv-tipo">
         ${sevChip(sev)}
       </td>
       <td class="rv-desc">
-        <div class="rv-desc-titulo">${categoriaTexto} ${regla ? `<span class="rv-regla">${esc(regla)}</span>` : ""}</div>
+        <div class="rv-desc-titulo">${categoriaTexto}</div>
         <div class="rv-desc-texto">${mensaje}</div>
+        ${regla ? `<div class="rv-regla">${icon("tag")} Regla ${regla}</div>` : ""}
         ${excerpt}
         ${sugerencia}
       </td>
       <td class="rv-ubi">
-        <div class="rv-ubi-icono">${icon("mapPin")}</div>
-        <div class="rv-ubi-texto">${ubic}</div>
+        <div class="rv-ubi-texto">${esc(ubic.principal)}</div>
+        ${ubic.secundario ? `<div class="rv-ubi-sec">${esc(ubic.secundario)}</div>` : ""}
       </td>
       <td class="rv-prio">
-        <span class="rv-prio-chip rv-prio-${sev}">${SEV_TEXT[sev]}</span>
+        <span class="rv-prio-chip rv-prio-${sev}">${SEV_PRIO[sev]}</span>
       </td>
       <td class="rv-acc">
-        <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver">${icon("eye")}</button>
-        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Mas opciones">${icon("more")}</button>
+        <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver en el documento">${icon("eye")}</button>
+        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Mas opciones">${icon("moreV")}</button>
         <div class="rv-more-pop" id="rv-pop-${indice}" hidden>
           <button class="rv-pop-item" data-act="corregir" data-i="${indice}">${icon("fix")} Corregir</button>
           <button class="rv-pop-item" data-act="descartar" data-i="${indice}">${icon("xCircle")} Descartar</button>
         </div>
       </td>
     </tr>`;
-}
-
-function nivel(score) {
-  if (score == null) return { txt: "Sin datos", clase: "none" };
-  if (score >= 75) return { txt: "Alto", clase: "alto" };
-  if (score >= 50) return { txt: "Medio", clase: "medio" };
-  return { txt: "Bajo", clase: "bajo" };
 }
 
 /* El anillo avanza segun el cumplimiento. El valor viaja como variable CSS
@@ -169,15 +180,24 @@ function pintarAnillo(score) {
   ring.style.setProperty("--ring-color", color);
 }
 
-function tarjeta(clase, icono, valor, texto, enlaceTexto, enlaceAct) {
-  const enlace = enlaceTexto ? `<a class="rv-card-link" data-act="${enlaceAct}" href="#">${esc(enlaceTexto)}</a>` : "";
-  return `<div class="rv-card ${clase}">
-      <span class="rv-card-icn">${icono}</span>
-      <div class="rv-card-info">
-        <div class="rv-card-num">${esc(valor)}</div>
-        <div class="rv-card-label">${esc(texto)}</div>
-        ${enlace}
-      </div>
+/* Tarjetas del informe: misma pieza que las de Inicio (.stat), para que el
+   panel y el informe no se vean como dos aplicaciones distintas. La barra de
+   progreso solo la lleva la tarjeta de cumplimiento. */
+function tarjeta(tone, icono, valor, texto, enlaceTexto, enlaceAct, barra) {
+  const enlace = enlaceTexto
+    ? `<button class="stat-link" data-act="${enlaceAct}">${esc(enlaceTexto)}</button>`
+    : "";
+  const pct = barra == null ? null : Math.max(0, Math.min(100, Number(barra) || 0));
+  const bar =
+    pct == null
+      ? ""
+      : `<div class="stat-bar"><div class="stat-bar-fill" style="width:${pct}%"></div></div>`;
+  return `<div class="stat ${tone}${valor === "—" ? " vacio" : ""}">
+      <span class="stat-icn">${icono}</span>
+      <span class="stat-num">${esc(valor)}</span>
+      <span class="stat-label">${esc(texto)}</span>
+      ${bar}
+      ${enlace}
     </div>`;
 }
 
@@ -197,18 +217,17 @@ function render() {
   const desde = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrada.slice(desde, desde + POR_PAGINA);
 
-  // Chips de estado (como la imagen de referencia)
+  // Chips de filtro: el activo va relleno con su color y el resto con el tinte
   const chips = [
-    ["all", "Todos", cuentas.all || 0, "var(--accent)"],
-    ["error", "Errores", cuentas.error || 0, "var(--error)"],
-    ["warning", "Avisos", cuentas.warning || 0, "var(--warning)"],
-    ["info", "Observaciones", cuentas.info || 0, "var(--info)"],
+    ["all", "Todos", cuentas.all || 0, "var(--accent)", "var(--accent-soft)"],
+    ["error", "Errores", cuentas.error || 0, "var(--error)", "#fbe9e7"],
+    ["warning", "Avisos", cuentas.warning || 0, "var(--warning)", "#fdf3e0"],
+    ["info", "Observaciones", cuentas.info || 0, "var(--info)", "#e8f1f8"],
   ]
     .map(
-      ([k, texto, n, col]) =>
-        `<button data-filter="${k}" class="rv-chip ${filtro === k ? "active" : ""}" style="--c:${col}">
-          ${texto} <b>${n}</b>
-        </button>`
+      ([k, texto, n, col, fondo]) =>
+        `<button data-filter="${k}" class="rv-chip ${filtro === k ? "active" : ""}"
+          style="--c:${col};--bg:${fondo}">${texto} <b>${n}</b></button>`
     )
     .join("");
 
@@ -240,42 +259,43 @@ function render() {
         </div>
       </div>
 
-      <!-- Tarjetas de estadisticas (estilo Inicio) -->
-      <div class="rv-cards">
-        ${tarjeta("rv-card",
+      <!-- Tarjetas de estadisticas (mismas que en Inicio) -->
+      <div class="stats rv-stats">
+        ${tarjeta("",
           icon("chart"),
-          score == null ? "0 %" : esc(score) + " %",
+          score == null ? "—" : esc(score) + " %",
           "Cumplimiento",
-          score == null ? "Sin datos" : `Su documento tiene un ${nivel(score).txt.toLowerCase()} avance.`,
-          "Ver informe"
+          "Ver informe",
+          "tabla",
+          score
         )}
-        ${tarjeta("rv-card",
-          icon("error"),
+        ${tarjeta("error",
+          icon("search"),
           cuentas.error || 0,
           "Errores",
-          "Requieren correccion",
-          "Ver en el editor"
+          "Ver en el editor",
+          "editor"
         )}
-        ${tarjeta("rv-card",
-          icon("alert"),
+        ${tarjeta("warning",
+          icon("clipboard"),
           cuentas.warning || 0,
           "Avisos",
-          "Revisar y validar",
-          "Ver en el editor"
+          "Ver en el editor",
+          "editor"
         )}
-        ${tarjeta("rv-card",
+        ${tarjeta("info",
           icon("info"),
           cuentas.info || 0,
           "Observaciones",
-          "Informacion adicional",
-          "Ver en el editor"
+          "Ver en el editor",
+          "editor"
         )}
-        ${tarjeta("rv-card",
-          icon("clipboard"),
+        ${tarjeta("",
+          icon("docs"),
           cuentas.all || 0,
           "Hallazgos en total",
-          "En todo el documento",
-          "Ver informe"
+          "Ver informe",
+          "tabla"
         )}
       </div>
 
@@ -294,25 +314,19 @@ function render() {
           <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
             value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
         </div>
-        <div class="rv-select-wrap">
-          <label class="rv-select-lbl">Tipo de hallazgo</label>
-          <select id="rv-tipo" aria-label="Tipo de hallazgo">
-            <option value="">Todos</option>
-            <option value="error">Error</option>
-            <option value="warning">Aviso</option>
-            <option value="info">Observacion</option>
-          </select>
-        </div>
-        <div class="rv-select-wrap">
-          <label class="rv-select-lbl">Prioridad</label>
-          <select id="rv-prioridad" aria-label="Prioridad">
-            <option value="">Todas</option>
-            <option value="error">Alta</option>
-            <option value="warning">Media</option>
-            <option value="info">Baja</option>
-          </select>
-        </div>
-        <button class="rv-btn-limpiar" data-act="limpiar">${icon("xCircle")} Limpiar filtros</button>
+        <select id="rv-tipo" class="rv-sel" required aria-label="Tipo de hallazgo">
+          <option value="" ${filtro === "all" ? "selected" : ""}>Tipo de hallazgo</option>
+          <option value="error" ${filtro === "error" ? "selected" : ""}>Error</option>
+          <option value="warning" ${filtro === "warning" ? "selected" : ""}>Aviso</option>
+          <option value="info" ${filtro === "info" ? "selected" : ""}>Observacion</option>
+        </select>
+        <select id="rv-prioridad" class="rv-sel" required aria-label="Prioridad">
+          <option value="" ${filtro === "all" ? "selected" : ""}>Prioridad</option>
+          <option value="error" ${filtro === "error" ? "selected" : ""}>Alta</option>
+          <option value="warning" ${filtro === "warning" ? "selected" : ""}>Media</option>
+          <option value="info" ${filtro === "info" ? "selected" : ""}>Baja</option>
+        </select>
+        <button class="rv-btn-limpiar" data-act="limpiar">${icon("filter")} Limpiar filtros</button>
       </div>
 
       <!-- Tabla CRUD -->
@@ -321,8 +335,8 @@ function render() {
           <thead>
             <tr>
               <th scope="col">Tipo</th>
-              <th scope="col">Descripcion del hallazgo</th>
-              <th scope="col">Ubicacion</th>
+              <th scope="col">Descripción del hallazgo</th>
+              <th scope="col">Ubicación</th>
               <th scope="col">Prioridad</th>
               <th scope="col" class="rv-acc-col">Acciones</th>
             </tr>
@@ -450,8 +464,12 @@ function mount(el) {
     if (b.closest(".rv-iconbtn, .rv-pop-item")) return;
     b.addEventListener("click", () => {
       const act = b.dataset.act;
-      if (act === "volver") Router.go("correcciones");
-      else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
+      if (act === "volver" || act === "editor") Router.go("correcciones");
+      else if (act === "tabla") {
+        // "Ver informe" lleva a la tabla de hallazgos, que es el informe
+        const tabla = el.querySelector(".rv-tablewrap");
+        if (tabla) tabla.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
     });
   });
 }

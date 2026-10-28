@@ -18,5 +18,7 @@ tests/_informe_generado.docx
 
 # datos locales del agente (no forman parte del proyecto)
 .workbuddy-ai/
+# registros de ejecucion locales
+data/
 # documentacion de trabajo local (no se publica)
 inf/

@@ -68,6 +68,12 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     mapPin: '<path d="M21 10c0 7-3 9-3 9H3c0-7 3-9 3-9 0-4-1-8-3-8 0 4 1 8 3 8z"/><circle cx="12" cy="10" r="3"/>',
     fix: '<path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/><path d="M4 6h5"/><path d="M4 10h4"/>',
     info: '<path d="M12 12V8M12 17l2 2M12 17l-2 2M12 4h.01"/>',
+    /* "i" dentro de un circulo, para la etiqueta de observacion */
+    infoCircle: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="11.2" x2="12" y2="16.4"/><circle cx="12" cy="7.8" r="1.1"/>',
+    /* tres puntos verticales: menu de acciones de cada fila */
+    moreV: '<circle cx="12" cy="5.6" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.4" r="1.3"/>',
+    /* etiqueta de regla (Regla APA 7.2) */
+    tag: '<path d="M20.6 12.6 12.4 20.8a1.6 1.6 0 0 1-2.3 0L3.4 14a1.6 1.6 0 0 1-.5-1.2V4.6a1.6 1.6 0 0 1 1.6-1.6h8.2c.4 0 .9.2 1.2.5l6.7 6.7a1.6 1.6 0 0 1 0 2.4z"/><circle cx="7.8" cy="7.8" r="1.5"/>',
     error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
   };
 
