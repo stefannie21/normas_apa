@@ -169,13 +169,14 @@ function pintarAnillo(score) {
   ring.style.setProperty("--ring-color", color);
 }
 
-function tarjeta(clase, icono, valor, texto, subtexto) {
+function tarjeta(clase, icono, valor, texto, enlaceTexto, enlaceAct) {
+  const enlace = enlaceTexto ? `<a class="rv-card-link" data-act="${enlaceAct}" href="#">${esc(enlaceTexto)}</a>` : "";
   return `<div class="rv-card ${clase}">
       <span class="rv-card-icn">${icono}</span>
       <div class="rv-card-info">
         <div class="rv-card-num">${esc(valor)}</div>
         <div class="rv-card-label">${esc(texto)}</div>
-        ${subtexto ? `<div class="rv-card-sub">${esc(subtexto)}</div>` : ""}
+        ${enlace}
       </div>
     </div>`;
 }
@@ -239,37 +240,42 @@ function render() {
         </div>
       </div>
 
-      <!-- Tarjetas de estadisticas -->
+      <!-- Tarjetas de estadisticas (estilo Inicio) -->
       <div class="rv-cards">
-        ${tarjeta("rv-card-score",
-          `<div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>`,
-          esc(score == null ? "--" : score),
-          "Nivel de cumplimiento APA",
-          score == null ? "Su documento tiene un bajo avance." : `Su documento tiene un ${nivel(score).txt.toLowerCase()} avance.`
+        ${tarjeta("rv-card",
+          icon("chart"),
+          score == null ? "0 %" : esc(score) + " %",
+          "Cumplimiento",
+          score == null ? "Sin datos" : `Su documento tiene un ${nivel(score).txt.toLowerCase()} avance.`,
+          "Ver informe"
         )}
-        ${tarjeta("rv-card-error",
-          `<span class="rv-sev-chip rv-sev-error">${icon("error")} Error</span>`,
+        ${tarjeta("rv-card",
+          icon("error"),
           cuentas.error || 0,
           "Errores",
-          "Requieren correccion"
+          "Requieren correccion",
+          "Ver en el editor"
         )}
-        ${tarjeta("rv-card-warning",
-          `<span class="rv-sev-chip rv-sev-warning">${icon("alert")} Aviso</span>`,
+        ${tarjeta("rv-card",
+          icon("alert"),
           cuentas.warning || 0,
           "Avisos",
-          "Revisar y validar"
+          "Revisar y validar",
+          "Ver en el editor"
         )}
-        ${tarjeta("rv-card-info",
-          `<span class="rv-sev-chip rv-sev-info">${icon("info")} Observacion</span>`,
+        ${tarjeta("rv-card",
+          icon("info"),
           cuentas.info || 0,
           "Observaciones",
-          "Informacion adicional"
+          "Informacion adicional",
+          "Ver en el editor"
         )}
-        ${tarjeta("rv-card-total",
+        ${tarjeta("rv-card",
           icon("clipboard"),
           cuentas.all || 0,
-          "Total de hallazgos",
-          "En todo el documento"
+          "Hallazgos en total",
+          "En todo el documento",
+          "Ver informe"
         )}
       </div>
 

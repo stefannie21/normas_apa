@@ -881,24 +881,6 @@ body.reading #page { cursor: default; }
   padding-bottom: 12px; margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
-.report-pane .score-ring { width: 62px; height: 62px; flex: 0 0 62px; }
-.report-pane .score-ring::before { inset: 7px; }
-.report-pane .score-ring span { font-size: 1.05rem; }
-.report-pane .score-ring small { font-size: .7rem; }
-.report-pane .score-label { font-size: .84rem; font-weight: 600; color: var(--ink); }
-/* las tarjetas del panel van de dos en dos */
-.report-pane .pane-cards { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.report-pane .pane-card { padding: 8px 10px; }
-.report-pane .pane-card .pc-num { font-size: 1.2rem; }
-.report-pane .pane-card .pc-label { font-size: .72rem; }
-/* los filtros de gravedad, en una sola linea con salto si no caben */
-.report-pane .pane-filters { margin-bottom: 10px; }
-/* chips de categoria (los abre el boton de embudo) */
-.report-pane .pane-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.report-pane .pane-cats button {
-  border: 1px solid var(--line); background: #fff; color: var(--muted);
-  border-radius: 999px; padding: 3px 10px; font: inherit; font-size: .74rem; cursor: pointer;
-}
 .report-pane .pane-cats button b { font-weight: 700; }
 .report-pane .pane-cats button:hover { border-color: #b9d2f2; color: var(--accent); }
 .report-pane .pane-cats button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -2037,7 +2019,7 @@ body.reading #page { cursor: default; }
 .rv-user-email { font-size: .76rem; color: var(--muted); white-space: nowrap; }
 .rv-user-arrow { font-size: .65rem; color: var(--muted); }
 
-/* ---------- Tarjetas de estadisticas (una sola fila) ---------- */
+/* ---------- Tarjetas de estadisticas (Reportes - estilo Inicio) ---------- */
 .rv-cards {
   display: flex;
   flex-wrap: nowrap;
@@ -2047,62 +2029,34 @@ body.reading #page { cursor: default; }
 }
 .rv-cards::-webkit-scrollbar { display: none; }
 .rv-card {
-  flex: 1 1 auto;
-  min-width: 0;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px 18px;
+  border-radius: 11px;
+  padding: 15px 16px;
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  gap: 3px;
 }
 .rv-card-icn {
   display: grid; place-items: center;
-  width: 44px; height: 44px; flex: 0 0 44px;
-  border-radius: 12px;
-  color: #fff; font-size: 1rem; font-weight: 700;
+  width: 32px; height: 32px; flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
-.rv-card-icn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; }
+.rv-card-icn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
 .rv-card-info { min-width: 0; }
-.rv-card-num { font-size: 1.9rem; font-weight: 800; line-height: 1.1; color: var(--ink); }
-.rv-card-label { font-size: .82rem; color: var(--muted); margin-bottom: 2px; }
-.rv-card-sub { font-size: .76rem; color: #5b6673; }
-
-.rv-card-score {
-  align-items: center;
-  padding: 18px;
-  flex-direction: row;
-  gap: 16px;
-  border: none;
+.rv-card-num { font-size: 1.45rem; font-weight: 800; line-height: 1.15; color: var(--ink); margin-bottom: 1px; }
+.rv-card-vacio .rv-card-num { color: #9aa5b1; }
+.rv-card-label { font-size: .78rem; color: var(--muted); }
+.rv-card-link {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--accent);
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
 }
-.rv-card-score .rv-card-icn { flex: 0 0 auto; }
-.score-ring {
-  width: 56px; height: 56px; flex: 0 0 56px;
-  border-radius: 50%;
-  background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), #e3e7ed 0);
-  display: grid; place-items: center;
-}
-.score-ring span { font-size: 1.1rem; font-weight: 800; color: var(--ink); }
-.score-ring small { font-size: .65rem; color: var(--muted); }
-.rv-card-score .rv-card-info { flex: 1; min-width: 0; }
-.rv-card-score .rv-card-num { display: none; }
-.rv-card-score .rv-card-label { font-size: .86rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-
-.rv-card-error { border-color: #f6d9d4; background: #fdf1ef; }
-.rv-card-error .rv-card-icn { background: #f6d9d4; color: var(--error); }
-.rv-card-warning { border-color: #f6e4c2; background: #fdf8f0; }
-.rv-card-warning .rv-card-icn { background: #f6e4c2; color: #b9770e; }
-.rv-card-info { border-color: #d7e7f4; background: #eff6fb; }
-.rv-card-info .rv-card-icn { background: #d7e7f4; color: var(--info); }
-.rv-card-total { border-color: #e2d9f6; background: #f4f0fc; }
-.rv-card-total .rv-card-icn { background: #e2d9f6; color: #6b4fbb; }
-
-.rv-sev-chip { display: inline-flex; align-items: center; gap: 6px; }
-.rv-sev-chip.rv-sev-error { background: #fdecec; color: #c0392b; border: 1px solid #f5c6c6; }
-.rv-sev-chip.rv-sev-warning { background: #fdf7e9; color: #b9770e; border: 1px solid #f0ddad; }
-.rv-sev-chip.rv-sev-info { background: #eef4fb; color: #2f6f9f; border: 1px solid #c9dce9; }
-.rv-sev-chip [data-icon] svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+.rv-card-link:hover { text-decoration: underline; }
 
 /* ---------- Chips de filtro + descargar ---------- */
 .rv-filtros-bar {
@@ -2239,16 +2193,6 @@ body.reading #page { cursor: default; }
 
 /* Tipo: icono + etiqueta */
 .rv-tipo { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.rv-sev-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: .8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
 .rv-sev-chip.rv-sev-error { background: #fdecec; color: #c0392b; border: 1px solid #f5c6c6; }
 .rv-sev-chip.rv-sev-warning { background: #fdf7e9; color: #b9770e; border: 1px solid #f0ddad; }
 .rv-sev-chip.rv-sev-info { background: #eef4fb; color: #2f6f9f; border: 1px solid #c9dce9; }
