@@ -107,20 +107,22 @@ import { Library } from "../library.js";
               <p>Abre tu proyecto de tesis, verifica el cumplimiento de las normas
                  APA (7.ª edición) y corrige de forma automática lo que se puede
                  corregir sin criterio humano.</p>
-              <div class="drop-zone" data-act="open" role="button" tabindex="0">
-                <div class="dz-cloud">
-                  <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12a5 5 0 0 1 5-5h2a2 2 0 0 1 2 2v2a5 5 0 0 1 5 5v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
-                    <path d="M12 14V8M12 8l-3 3M12 8l3 3"/>
-                  </svg>
-                </div>
-                <h2 class="dz-title">Arrastra aquí tu tesis .docx</h2>
-                <p class="dz-sub">o haz clic para explorar en tu computadora</p>
-                <span class="dz-badge">${icon("shield")} Cifrado de extremo a extremo · Ningún texto es publicado</span>
-              </div>
+              <button class="hero-btn" data-act="open">${icon("folder")} ${conDoc ? "Abrir otra tesis .docx" : "Abrir tesis .docx"}</button>
             </div>
             <span class="hero-art">${icon("cap")}</span>
           </section>
+
+          <div class="drop-zone" data-act="open" role="button" tabindex="0">
+            <div class="dz-cloud">
+              <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12a5 5 0 0 1 5-5h2a2 2 0 0 1 2 2v2a5 5 0 0 1 5 5v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
+                <path d="M12 14V8M12 8l-3 3M12 8l3 3"/>
+              </svg>
+            </div>
+            <h2 class="dz-title">Arrastra aquí tu tesis .docx</h2>
+            <p class="dz-sub">o haz clic para explorar en tu computadora</p>
+            <span class="dz-badge">${icon("shield")} Cifrado de extremo a extremo · Ningún texto es publicado</span>
+          </div>
 
           <section class="stats">
             ${stat("", "chart", val(st.score != null ? st.score + " %" : "—"), "Nivel de cumplimiento", "pane")}
@@ -136,33 +138,6 @@ import { Library } from "../library.js";
             <ul class="recientes" id="dash-recientes">${documento}</ul>
           </section>
         </div>
-
-        <aside class="dash-side">
-          <section class="card">
-            <div class="card-head"><h2>${icon("spark")} Revisión con IA</h2></div>
-            <p class="card-text">Como segunda opinión, la IA clasifica citas y referencias
-               para detectar elementos APA ausentes. <b>Nunca escribe en el documento.</b></p>
-            <ul class="check">
-              <li>Formato y estructura APA</li>
-              <li>Citas en el texto</li>
-              <li>Lista de referencias</li>
-              <li>Solo envía citas y referencias, no el texto completo</li>
-            </ul>
-            <p class="card-note" id="dash-ai">Comprobando el estado del servicio…</p>
-          </section>
-
-          <section class="card">
-            <div class="card-head"><h2>${icon("spark")} Consejos rápidos</h2></div>
-            <ul class="tips">
-              <li>Usa palabras clave relevantes en la introducción.</li>
-              <li>Revisa la coherencia entre objetivos, metodología y conclusiones.</li>
-              <li>Evita el uso excesivo de citas textuales.</li>
-              <li>Mantén un estilo de redacción claro y formal.</li>
-              <li>Verifica que cada cita tenga su entrada en Referencias.</li>
-              <li>En APA 7, con 3 o más autores se usa <em>et al.</em> desde la primera mención.</li>
-            </ul>
-          </section>
-        </aside>
       </div>`;
   }
 
