@@ -1606,6 +1606,167 @@ body.reading #page { cursor: default; }
 .tv-legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 .tv-legend b { margin-left: auto; font-weight: 700; }
 
+/* ---------- Mis tesis: estadísticas y filtros de estado ---------- */
+.tv-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.tv-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.tv-stat-card:hover {
+  border-color: #b9d2f2;
+  box-shadow: 0 4px 12px rgba(31, 107, 234, .08);
+}
+.tv-stat-card.proceso {
+  border-color: #f6e4c2;
+  background: #fdf8f0;
+}
+.tv-stat-card.pendiente {
+  border-color: #f6d9d4;
+  background: #fdf1ef;
+}
+.tv-stat-body { display: flex; align-items: center; gap: 12px; flex: 1; }
+.tv-stat-icn {
+  display: grid; place-items: center;
+  width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tv-stat-icn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; }
+.tv-stat-card.proceso .tv-stat-icn { background: #fdf2dc; color: #b9770e; }
+.tv-stat-card.pendiente .tv-stat-icn { background: #fde8e8; color: #c0392b; }
+.tv-stat-info { min-width: 0; }
+.tv-stat-label { font-size: .78rem; color: var(--muted); margin-bottom: 2px; }
+.tv-stat-num { font-size: 1.5rem; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.tv-stat-arrow {
+  font-size: 1rem; color: #c7d2de; line-height: 1;
+}
+
+/* filtros de estado tipo chips */
+.tv-status-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.tv-st-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: .82rem; cursor: pointer;
+}
+.tv-st-tab:hover { background: var(--accent-soft); }
+.tv-st-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.tv-st-tab b { font-weight: 800; opacity: .9; font-size: .82rem; }
+
+.tv-summary-wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+
+/* actividad reciente */
+.tv-activity { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.tv-act-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f2f5f8;
+}
+.tv-act-item:last-child { border-bottom: none; }
+.tv-act-icn {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex: 0 0 34px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tv-act-icn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+.tv-act-info { min-width: 0; flex: 1; }
+.tv-act-titulo { font-size: .86rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-act-meta { font-size: .76rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-act-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+.tv-act-dot.pendiente { background: #c0392b; }
+.tv-act-dot.proceso { background: #b9770e; }
+.tv-act-dot.completada { background: #1e8449; }
+.tv-ver-todas {
+  margin-top: 6px;
+  font-size: .8rem;
+  color: var(--accent);
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.tv-ver-todas:hover { text-decoration: underline; }
+
+/* botón filtrados */
+.tv-btn-filtros {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: .84rem; cursor: pointer;
+}
+.tv-btn-filtros svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.tv-btn-filtros:hover { border-color: #b9d2f2; background: var(--accent-soft); color: var(--accent); }
+
+/* tabla ajustada a nuevas columnas */
+.tv-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tv-table th { padding: 10px 14px; }
+
+/* botón más acciones */
+.tv-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  z-index: 10;
+  padding: 6px 0;
+}
+.tv-more-menu[hidden] { display: none; }
+.tv-more-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit; font-size: .84rem; cursor: pointer;
+  text-align: left;
+}
+.tv-more-item:hover { background: #f4f7fb; }
+.tv-more-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+@media (max-width: 1080px) {
+  .tv-grid { grid-template-columns: 1fr; }
+}
+
 /* ============================================================
    Cinta adaptable
    La cinta va en UNA fila siempre y los grupos se reparten TODO el ancho de

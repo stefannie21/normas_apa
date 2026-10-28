@@ -42,21 +42,6 @@ function cuentas() {
   return c;
 }
 
-function tabsHtml() {
-  const c = cuentas();
-  return [
-    ["", "Todas"],
-    ["proceso", "En proceso"],
-    ["completada", "Completadas"],
-    ["pendiente", "Pendientes"],
-  ]
-    .map(([valor, texto]) => {
-      const n = valor ? c[valor] : rows.length;
-      return `<button class="tv-tab${tabActual === valor ? " active" : ""}" data-tv-tab="${valor}">${texto} <b>${n}</b></button>`;
-    })
-    .join("");
-}
-
 function leyendaHtml() {
   const c = cuentas();
   return ["completada", "proceso", "pendiente"]
@@ -68,21 +53,62 @@ function leyendaHtml() {
 }
 
 function render() {
+  const c = cuentas();
+  const total = rows.length;
   return `
     <div class="tesis-view">
       <div class="tv-head">
         <span class="tv-head-icn">${icon("docs")}</span>
         <div>
           <h1>Mis tesis</h1>
-          <p>Aquí puedes ver todas tus tesis, su estado y el progreso de corrección.</p>
+          <p>Gestiona tus documentos y consulta el avance de corrección.</p>
         </div>
         <button class="tv-new" data-act="new"><span class="tv-new-plus">+</span> Nueva tesis</button>
       </div>
 
+      <!-- Tarjetas de resumen -->
+      <div class="tv-stats">
+        <div class="tv-stat-card">
+          <div class="tv-stat-body">
+            <span class="tv-stat-icn">${icon("docs")}</span>
+            <div class="tv-stat-info">
+              <div class="tv-stat-label">Total de tesis</div>
+              <div class="tv-stat-num">${total}</div>
+            </div>
+          </div>
+          <span class="tv-stat-arrow">&gt;</span>
+        </div>
+        <div class="tv-stat-card proceso">
+          <div class="tv-stat-body">
+            <span class="tv-stat-icn">${icon("pending")}</span>
+            <div class="tv-stat-info">
+              <div class="tv-stat-label">En proceso</div>
+              <div class="tv-stat-num">${c.proceso}</div>
+            </div>
+          </div>
+          <span class="tv-stat-arrow">&gt;</span>
+        </div>
+        <div class="tv-stat-card pendiente">
+          <div class="tv-stat-body">
+            <span class="tv-stat-icn">${icon("alert")}</span>
+            <div class="tv-stat-info">
+              <div class="tv-stat-label">Pendientes</div>
+              <div class="tv-stat-num">${c.pendiente}</div>
+            </div>
+          </div>
+          <span class="tv-stat-arrow">&gt;</span>
+        </div>
+      </div>
+
       <div class="tv-grid">
         <div class="tv-main">
-          <div class="tv-tabs" id="tv-tabs">${tabsHtml()}</div>
           <div class="tv-toolbar">
+            <div class="tv-status-tabs">
+              <button class="tv-st-tab${tabActual === "" ? " active" : ""}" data-tv-tab="">Todas <b>${total}</b></button>
+              <button class="tv-st-tab${tabActual === "proceso" ? " active" : ""}" data-tv-tab="proceso">En proceso <b>${c.proceso}</b></button>
+              <button class="tv-st-tab${tabActual === "completada" ? " active" : ""}" data-tv-tab="completada">Completadas <b>${c.completada}</b></button>
+              <button class="tv-st-tab${tabActual === "pendiente" ? " active" : ""}" data-tv-tab="pendiente">Pendientes <b>${c.pendiente}</b></button>
+            </div>
             <div class="tv-search">
               ${icon("search")}
               <input type="search" id="tv-q" placeholder="Buscar por título, autor o código..." aria-label="Buscar tesis">
@@ -105,15 +131,16 @@ function render() {
                 <option value="cumplimiento">Cumplimiento</option>
               </select>
             </label>
+            <button class="tv-btn-filtros" title="Filtrados">${icon("filter")} Filtrados</button>
           </div>
 
           <div class="tv-tablewrap">
             <table class="tv-table">
               <thead>
                 <tr>
-                  <th scope="col">Título de la tesis</th>
+                  <th scope="col">Documento</th>
                   <th scope="col">Autor</th>
-                  <th scope="col">Fecha de subida</th>
+                  <th scope="col">Última actividad</th>
                   <th scope="col">Estado</th>
                   <th scope="col" class="tv-acc-col">Acciones</th>
                 </tr>
@@ -135,11 +162,32 @@ function render() {
                 <p>Estado general de tus trabajos</p>
               </div>
             </div>
-            <div class="tv-donut-wrap">
+            <div class="tv-summary-wrap">
               <div class="tv-donut" id="tv-donut">
-                <div class="tv-donut-hole"><strong id="tv-total">0</strong><span>Total</span></div>
+                <div class="tv-donut-hole"><strong id="tv-total">${total}</strong><span>Total</span></div>
               </div>
               <ul class="tv-legend" id="tv-legend">${leyendaHtml()}</ul>
+            </div>
+          </div>
+
+          <div class="tv-card">
+            <div class="tv-card-head">
+              <span class="tv-card-icn">${icon("clock")}</span>
+              <div>
+                <h2>Actividad reciente</h2>
+                <a class="tv-ver-todas" href="#">Ver todas &rarr;</a>
+              </div>
+            </div>
+            <div class="tv-activity" id="tv-activity"></div>
+          </div>
+
+          <div class="tv-card">
+            <div class="tv-card-head">
+              <span class="tv-card-icn">${icon("idea")}</span>
+              <div>
+                <h2>Consejo</h2>
+                <p>Revisa primero los documentos pendientes para organizar tu trabajo.</p>
+              </div>
             </div>
           </div>
         </aside>
@@ -162,7 +210,7 @@ function pintarTabla() {
           <span class="tv-file-icn ${ext}">${Icons.svg("docs", 19)}</span>
           <span class="tv-file-txt">
             <span class="tv-file-titulo" title="${esc(r.title)}">${esc(r.title)}</span>
-            <span class="tv-file-sub">${esc(r.name)} · ${esc(Library.humanSize(r.size))}</span>
+            <span class="tv-file-sub">${esc(Library.humanSize(r.size))} ${r.author ? "· " + esc(r.author) : ""}</span>
           </span>
         </span></td>
         <td>${esc(r.author || "—")}</td>
@@ -171,7 +219,7 @@ function pintarTabla() {
         <td class="tv-row-acc">
           <button data-tv-row="open" title="Abrir esta tesis">${Icons.svg("eye", 16)}</button>
           <button data-tv-row="download" title="Descargar el archivo original">${Icons.svg("save", 16)}</button>
-          <button class="danger" data-tv-row="delete" title="Eliminar de la biblioteca">${Icons.svg("trash", 16)}</button>
+          <button data-tv-row="more" title="Más acciones">${Icons.svg("more", 16)}</button>
         </td>
       </tr>`;
     })
@@ -187,11 +235,9 @@ function pintarTabla() {
       : "Todavía no hay tesis. Pulsa <b>+ Nueva tesis</b> para subir la primera.";
   }
   const contador = document.getElementById("tv-count");
-  if (contador) contador.textContent = "Mostrando " + list.length + " de " + rows.length + " tesis";
+  if (contador) contador.textContent = "Mostrando 1 - " + Math.min(list.length, list.length) + " de " + rows.length + " tesis";
 
   // resumen y pestanas: el marco se pinto antes de que llegaran los datos
-  const tabsEl = document.getElementById("tv-tabs");
-  if (tabsEl) tabsEl.innerHTML = tabsHtml();
   const leyendaEl = document.getElementById("tv-legend");
   if (leyendaEl) leyendaEl.innerHTML = leyendaHtml();
 
@@ -212,6 +258,23 @@ function pintarTabla() {
       ? "conic-gradient(" + partes.join(",") + ")"
       : "conic-gradient(#e3e7ed 0 100%)";
   }
+
+  // actividad reciente: las 3 tesis mas recientes
+  const activity = document.getElementById("tv-activity");
+  if (activity) {
+    const recientes = [...rows].sort((a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || ""))).slice(0, 3);
+    activity.innerHTML = recientes.map((r) => {
+      const estadoClass = "tv-act-" + (r.status || "pendiente");
+      return `<div class="tv-act-item">
+        <span class="tv-act-icn">${icon("docs")}</span>
+        <div class="tv-act-info">
+          <div class="tv-act-titulo">${esc(r.title)}</div>
+          <div class="tv-act-meta">${esc(Library.LABEL[r.status] || "Pendiente")} · ${esc(Library.stamp(r.addedAt))}</div>
+        </div>
+        <span class="tv-act-dot ${estadoClass}"></span>
+      </div>`;
+    }).join("");
+  }
 }
 
 async function cargar() {
@@ -223,12 +286,12 @@ async function cargar() {
 function mount(el) {
   root = el;
 
-  const tabs = el.querySelector(".tv-tabs");
+  const tabs = el.querySelector(".tv-status-tabs");
   if (tabs) {
     tabs.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-tv-tab]");
+      const b = e.target.closest("[data-tv-st-tab]");
       if (!b) return;
-      tabActual = b.dataset.tvTab || "";
+      tabActual = b.dataset.tvStTab || "";
       pintarTodo();
     });
   }
@@ -262,6 +325,10 @@ function mount(el) {
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } else if (btn.dataset.tvRow === "more") {
+        const menu = btn.closest("tr").querySelector(".tv-more-menu");
+        document.querySelectorAll(".tv-more-menu").forEach((m) => m.hidden = true);
+        if (menu) menu.hidden = !menu.hidden;
       } else if (btn.dataset.tvRow === "delete") {
         await Library.remove(id);
         await cargar();

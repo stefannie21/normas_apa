@@ -60,6 +60,11 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     filter: '<path d="M3.5 5h17l-6.6 7.8V19l-3.8 2v-8.2z"/>',
     bulb: '<path d="M9.5 18.5h5"/><path d="M10.5 21.5h3"/><path d="M12 3a5.8 5.8 0 0 0-3.4 10.6c.5.4.8 1 .9 1.6h5c.1-.6.4-1.2.9-1.6A5.8 5.8 0 0 0 12 3z"/>',
     xCircle: '<circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>',
+    pending: '<path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9z"/><path d="M12 7v4M12 17l2 2M12 17l-2 2"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    idea: '<path d="M13 2L3 14h9l1 8 10-12z"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="17" cy="12" r="1"/><circle cx="7" cy="12" r="1"/>',
   };
 
   function svg(name) {
