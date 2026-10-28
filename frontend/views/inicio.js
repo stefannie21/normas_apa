@@ -84,13 +84,21 @@ import { Library } from "../library.js";
 
     // sin dato no hay nada que ver: el enlace se oculta en vez de llevar a una
     // pantalla vacia
-    const stat = (tone, ico, num, label, enlace) => `
+    const stat = (tone, ico, num, label, enlace) => {
+      let extra = "";
+      if (label === "Cumplimiento" && conDoc && analizado) {
+        const pct = Math.max(0, Math.min(100, Number(st.score) || 0));
+        extra = `<div class="stat-bar"><div class="stat-bar-fill" style="width:${pct}%"></div></div>`;
+      }
+      return `
       <div class="stat ${tone}${num === "—" ? " vacio" : ""}">
         <span class="stat-icn">${icon(ico)}</span>
         <span class="stat-num">${esc(num)}</span>
         <span class="stat-label">${esc(label)}</span>
+        ${extra}
         ${enlace && num !== "—" ? `<button class="stat-link" data-go="${enlace}">${esc(enlace === "pane" ? "Ver informe" : "Ver en el editor")}</button>` : ""}
       </div>`;
+    };
 
     // la lista se rellena al momento con el documento abierto y, en cuanto la
     // biblioteca responde, se cambia por los tres ultimos documentos
@@ -106,17 +114,14 @@ import { Library } from "../library.js";
           <section class="hero">
             <div class="hero-text">
               <h1>Tu tesis, en mejores manos</h1>
-              <p>Abre tu proyecto de tesis, verifica el cumplimiento de las normas
-                 APA (7.ª edición) y corrige de forma automática lo que se puede
-                 corregir sin criterio humano.</p>
-              <button class="hero-btn" data-act="open">${icon("folder")} ${conDoc ? "Abrir otra tesis .docx" : "Abrir tesis .docx"}</button>
+              <p>Verifica el cumplimiento de las normas APA y mejora tu documento con correcciones guiadas.</p>
+              <button class="hero-btn" data-act="open">${conDoc ? "Abrir otra tesis .docx" : "Abrir tesis .docx"} <span class="btn-arrow">›</span></button>
             </div>
-            <span class="hero-art">${icon("cap")}</span>
           </section>
 
           <div class="drop-zone" data-act="open" role="button" tabindex="0">
             <div class="dz-cloud">
-              <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12a5 5 0 0 1 5-5h2a2 2 0 0 1 2 2v2a5 5 0 0 1 5 5v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
                 <path d="M12 14V8M12 8l-3 3M12 8l3 3"/>
               </svg>
@@ -127,7 +132,7 @@ import { Library } from "../library.js";
           </div>
 
           <section class="stats">
-            ${stat("", "chart", val(st.score != null ? st.score + " %" : "—"), "Nivel de cumplimiento", "pane")}
+            ${stat("", "chart", val(st.score != null ? st.score + " %" : "—"), "Cumplimiento", "pane")}
             ${stat("error", "search", error, "Errores", "correcciones")}
             ${stat("warning", "clipboard", avisa, "Avisos", "correcciones")}
             ${stat("", "docs", total, "Hallazgos en total", "pane")}

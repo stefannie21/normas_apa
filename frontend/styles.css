@@ -176,8 +176,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   align-items: center;
+  justify-content: flex-end;
 }
 .rec-buscar {
   display: inline-flex;
@@ -189,7 +190,7 @@ body {
 .rec-buscar input {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   font-size: .86rem;
   color: var(--ink);
   background: #fff;
@@ -203,7 +204,7 @@ body {
 .rec-filtros select {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   font-size: .86rem;
   color: var(--ink);
   background: #fff;
@@ -215,49 +216,47 @@ body {
   box-shadow: 0 0 0 3px rgba(24, 90, 189, .1);
 }
 
+/* ---------- Hero ---------- */
 .hero {
   display: flex;
   align-items: center;
   gap: 18px;
-  background: linear-gradient(120deg, #eaf2ff 0%, #f4f8ff 55%, #eaf4ff 100%);
+  background: #f4f7fb;
   border: 1px solid #d6e4fa;
-  border-radius: 13px;
-  padding: 22px 24px;
+  border-radius: 12px;
+  padding: 24px 28px;
 }
 .hero-text { flex: 1 1 auto; min-width: 0; }
-.hero h1 { margin: 0 0 6px; font-size: 1.5rem; color: #10305e; }
-.hero p { margin: 0 0 16px; color: #3f5a80; font-size: .88rem; line-height: 1.55; max-width: 56ch; }
+.hero h1 { margin: 0 0 8px; font-size: 1.6rem; color: #0f2d52; letter-spacing: .2px; }
+.hero p { margin: 0 0 14px; color: #4a6582; font-size: .92rem; line-height: 1.55; max-width: 62ch; }
 .hero-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--sb-active);
-  border: 1px solid var(--sb-active);
+  background: #1f6bea;
+  border: 1px solid #1f6bea;
   color: #fff;
   font-family: inherit;
-  font-size: .86rem;
+  font-size: .9rem;
   font-weight: 600;
   border-radius: 8px;
-  padding: 9px 16px;
+  padding: 10px 18px;
   cursor: pointer;
 }
-.hero-btn:hover { background: #1f5cd8; }
-.hero-btn [data-icon] svg { width: 16px; height: 16px; stroke: #fff; fill: none; }
-.hero-art { color: var(--sb-active); opacity: .5; }
-.hero-art [data-icon] svg { width: 108px; height: 108px; stroke: currentColor; fill: none; stroke-width: 1.2; }
+.hero-btn:hover { background: #1558b8; }
+.hero-btn .btn-arrow { font-size: 1rem; line-height: 1; }
 
 /* ---------- Zona de subida de tesis (Inicio) ---------- */
 .drop-zone {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border: 2px dashed var(--accent);
-  border-radius: 16px;
+  border-radius: 12px;
   background: #fff;
-  padding: 32px 20px;
-  max-width: 620px;
-  margin: 26px 0 0;
+  padding: 30px 20px;
+  width: 100%;
   cursor: pointer;
   transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
 }
@@ -271,51 +270,63 @@ body {
   outline-offset: 3px;
 }
 .dz-cloud { color: var(--accent); }
-.dz-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--ink); letter-spacing: .2px; }
-.dz-sub { margin: 0; font-size: .9rem; color: var(--muted); text-align: center; }
+.dz-title { margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: .2px; }
+.dz-sub { margin: 0; font-size: .92rem; color: var(--muted); text-align: center; }
 .dz-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: .78rem;
+  font-size: .8rem;
   color: #2e7d5b;
   background: #e8f5ee;
   border: 1px solid #b7dfcd;
   border-radius: 999px;
-  padding: 6px 12px;
-  margin-top: 6px;
+  padding: 6px 14px;
+  margin-top: 4px;
 }
 .dz-badge [data-icon] svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+/* ---------- Estadísticas ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .stat {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 15px 16px;
+  border-radius: 12px;
+  padding: 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .stat-icn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--accent-soft);
   color: var(--accent);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
-.stat-icn [data-icon] svg { width: 17px; height: 17px; stroke: currentColor; fill: none; }
+.stat-icn [data-icon] svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
 .stat.ok .stat-icn { background: #e2f4e9; color: #1e7a45; }
 .stat.error .stat-icn { background: #fde3e1; color: #b3372f; }
 .stat.warning .stat-icn { background: #fdf0d8; color: #96690d; }
-.stat-num { font-size: 1.45rem; font-weight: 700; color: var(--ink); line-height: 1.15; }
-/* sin dato que mostrar: no se disfraza un cero de un resultado */
+.stat-num { font-size: 1.75rem; font-weight: 800; color: var(--ink); line-height: 1.1; margin-bottom: 2px; }
 .stat.vacio .stat-num { color: #9aa5b1; }
-.stat-label { font-size: .78rem; color: var(--muted); }
+.stat-label { font-size: .8rem; color: var(--muted); line-height: 1.25; }
+.stat-bar {
+  margin-top: 6px;
+  height: 4px;
+  background: #e8edf3;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
 .stat-link {
   margin-top: 9px;
   align-self: flex-start;
@@ -329,28 +340,29 @@ body {
 }
 .stat-link:hover { text-decoration: underline; }
 
+/* ---------- Tarjeta Documentos recientes ---------- */
 .card {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 18px 20px;
 }
 .card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .card-head h2 {
   margin: 0;
-  font-size: .95rem;
+  font-size: .98rem;
   color: var(--ink);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.card-head [data-icon] svg { width: 17px; height: 17px; stroke: var(--accent); fill: none; }
+.card-head [data-icon] svg { width: 18px; height: 18px; stroke: var(--accent); fill: none; }
 .card-text { margin: 0 0 10px; font-size: .83rem; color: var(--muted); line-height: 1.55; }
 .card-note {
   margin: 12px 0 0;
