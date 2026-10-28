@@ -237,22 +237,6 @@ function render() {
           <h1>Reportes</h1>
           <p>Revise los hallazgos, el porcentaje de cumplimiento y el detalle de cada correccion.</p>
         </div>
-        <div class="rv-head-search">
-          <span class="rv-search-icn">${icon("search")}</span>
-          <input class="rv-search-header" type="search" placeholder="Buscar tesis, autor o codigo..."
-            value="${esc(busqueda)}" aria-label="Buscar tesis, autor o codigo">
-        </div>
-        <div class="rv-head-actions">
-          <span class="rv-notif">${icon("bell")}</span>
-          <div class="rv-user">
-            <span class="rv-user-icn">${icon("docs")}</span>
-            <div>
-              <div class="rv-user-name">Josi Maza</div>
-              <div class="rv-user-email">josimaza21@gmail.com</div>
-            </div>
-            <span class="rv-user-arrow">&#9660;</span>
-          </div>
-        </div>
       </div>
 
       <!-- Tarjetas de estadisticas -->
