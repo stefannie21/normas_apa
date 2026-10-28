@@ -171,6 +171,50 @@ body {
 .dash-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dash-side { display: flex; flex-direction: column; gap: 16px; }
 
+/* ---------- Filtros de documentos recientes ---------- */
+.rec-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.rec-buscar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.rec-buscar [data-icon] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.rec-buscar input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: .86rem;
+  color: var(--ink);
+  background: #fff;
+  min-width: 220px;
+}
+.rec-buscar input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(24, 90, 189, .1);
+}
+.rec-filtros select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: .86rem;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+}
+.rec-filtros select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(24, 90, 189, .1);
+}
+
 .hero {
   display: flex;
   align-items: center;

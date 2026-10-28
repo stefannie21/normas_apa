@@ -16,6 +16,8 @@ import { Library } from "../library.js";
   let app = null;
   // ultimos documentos de la biblioteca, ya ordenados y recortados a tres
   let recientes = [];
+  let filtroBuscar = "";
+  let filtroEstado = "";
 
   function s() {
     return app && typeof app.state === "function" ? app.state() : {};
@@ -133,7 +135,19 @@ import { Library } from "../library.js";
 
           <section class="card">
             <div class="card-head">
-              <h2>${icon("docs")} Recién abiertos</h2>
+              <h2>${icon("docs")} Documentos recientes</h2>
+            </div>
+            <div class="rec-filtros">
+              <div class="rec-buscar">
+                ${icon("search")}
+                <input type="text" id="rec-buscar-input" placeholder="Buscar documento..." value="${esc(filtroBuscar || "")}">
+              </div>
+              <select id="rec-estado-select">
+                <option value="">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="proceso">En proceso</option>
+                <option value="completada">Completada</option>
+              </select>
             </div>
             <ul class="recientes" id="dash-recientes">${documento}</ul>
           </section>
@@ -179,6 +193,21 @@ import { Library } from "../library.js";
 
     cargarRecientes();
     loadHealth();
+
+    const inpBuscar = document.getElementById("rec-buscar-input");
+    const selEstado = document.getElementById("rec-estado-select");
+    if (inpBuscar) {
+      inpBuscar.addEventListener("input", (e) => {
+        filtroBuscar = e.target.value;
+        cargarRecientes();
+      });
+    }
+    if (selEstado) {
+      selEstado.addEventListener("change", (e) => {
+        filtroEstado = e.target.value;
+        cargarRecientes();
+      });
+    }
   }
 
   // Abre un documento de la lista. Sin id (la fila del documento que ya esta
@@ -221,7 +250,15 @@ import { Library } from "../library.js";
     if (!docs.length) return;
 
     const cuando = (r) => String(r.analyzedAt || r.addedAt || "");
-    recientes = docs.sort((a, b) => cuando(b).localeCompare(cuando(a))).slice(0, 3);
+    const fb = (filtroBuscar || "").toLowerCase();
+    recientes = docs
+      .filter((r) => {
+        const texto = String(r.title || r.name || "").toLowerCase();
+        if (fb && !texto.includes(fb)) return false;
+        if (filtroEstado && r.status !== filtroEstado) return false;
+        return true;
+      })
+      .sort((a, b) => cuando(b).localeCompare(cuando(a)));
     const st = s();
     lista.innerHTML = recientes.map((r) => filaDoc(r, st)).join("");
     Dom.hydrate(lista);
