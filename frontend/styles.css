@@ -470,6 +470,28 @@ body {
    queda equilibrado y con aire entre botones. */
 .ribbon-group-controls { display: flex; flex-wrap: nowrap; gap: 4px; align-items: flex-start; justify-content: center; }
 .ribbon-group-label { text-align: center; font-size: .68rem; color: var(--muted); padding-top: 4px; }
+/* Pestañas distintas a Inicio: herramientas al lado (izquierda), con margen de
+   los bordes y aire entre controles, sin que los grupos se repartan todo el
+   ancho ni queden centrados. Inicio se deja tal como estaba. */
+.ribbon-panel.ribbon-side {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 14px;
+  padding-left: 14px;
+  padding-right: 14px;
+  align-items: flex-start;
+}
+.ribbon-panel.ribbon-side .ribbon-group {
+  flex: 0 0 auto;
+  min-width: auto;
+  max-width: none;
+  border-right: none;
+  padding: 0;
+}
+.ribbon-panel.ribbon-side .ribbon-group-controls {
+  justify-content: flex-start;
+  gap: 10px;
+}
 
 .rbtn {
   display: inline-flex; flex-direction: column; align-items: center; gap: 2px;

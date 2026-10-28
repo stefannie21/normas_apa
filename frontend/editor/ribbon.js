@@ -185,7 +185,7 @@ const Ribbon = (function () {
 
   function renderGroups(tab) {
     panelsEl.innerHTML = "";
-    const panel = el("div", "ribbon-panel active");
+    const panel = el("div", "ribbon-panel active" + (tab.id !== "inicio" ? " ribbon-side" : ""));
     tab.groups.forEach((g) => {
       const group = el("div", "ribbon-group");
       const controls = el("div", "ribbon-group-controls");
