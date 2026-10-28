@@ -107,7 +107,17 @@ import { Library } from "../library.js";
               <p>Abre tu proyecto de tesis, verifica el cumplimiento de las normas
                  APA (7.ª edición) y corrige de forma automática lo que se puede
                  corregir sin criterio humano.</p>
-              <button class="hero-btn" data-act="open">${icon("folder")} ${conDoc ? "Abrir otra tesis .docx" : "Abrir tesis .docx"}</button>
+              <div class="drop-zone" data-act="open" role="button" tabindex="0">
+                <div class="dz-cloud">
+                  <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12a5 5 0 0 1 5-5h2a2 2 0 0 1 2 2v2a5 5 0 0 1 5 5v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
+                    <path d="M12 14V8M12 8l-3 3M12 8l3 3"/>
+                  </svg>
+                </div>
+                <h2 class="dz-title">Arrastra aquí tu tesis .docx</h2>
+                <p class="dz-sub">o haz clic para explorar en tu computadora</p>
+                <span class="dz-badge">${icon("shield")} Cifrado de extremo a extremo · Ningún texto es publicado</span>
+              </div>
             </div>
             <span class="hero-art">${icon("cap")}</span>
           </section>
