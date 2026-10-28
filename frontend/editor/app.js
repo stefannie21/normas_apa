@@ -35,13 +35,15 @@ const App = (function () {
   }
 
   function updateQuickActions() {
-    if (quickActions) {
-      // `[hidden]` se aplica con !important en styles.css, así que no se ve
-      // afectado por el `display: flex` que tiene `.titlebar-right`.
-      quickActions.hidden = !isEditDocument();
-    }
+    const edit = isEditDocument();
+    // La barra de tareas (titulo del archivo + acciones rápidas) solo se
+    // muestra cuando estamos editando un documento. En el resto de secciones
+    // (Inicio, Mis tesis, Reportes, Ajustes) se oculta por completo.
+    if (titlebar) titlebar.hidden = !edit;
+    if (quickActions) quickActions.hidden = !edit;
   }
   const quickActions = document.getElementById("quick-actions");
+  const titlebar = document.querySelector(".titlebar");
   const emptyOpen = document.getElementById("empty-open");
   const statusMsg = document.getElementById("status-msg");
   const statusWords = document.getElementById("status-words");
