@@ -1992,7 +1992,6 @@ body.reading #page { cursor: default; }
 .rv-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
   padding: 16px 20px;
   margin-bottom: 18px;
