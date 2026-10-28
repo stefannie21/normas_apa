@@ -2038,14 +2038,18 @@ body.reading #page { cursor: default; }
 .rv-user-email { font-size: .76rem; color: var(--muted); white-space: nowrap; }
 .rv-user-arrow { font-size: .65rem; color: var(--muted); }
 
-/* ---------- Tarjetas de estadisticas ---------- */
+/* ---------- Tarjetas de estadisticas (una sola fila) ---------- */
 .rv-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 14px;
   margin: 0 20px 18px;
+  overflow-x: auto;
 }
+.rv-cards::-webkit-scrollbar { display: none; }
 .rv-card {
+  flex: 1 1 auto;
+  min-width: 0;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -2067,21 +2071,24 @@ body.reading #page { cursor: default; }
 .rv-card-sub { font-size: .76rem; color: #5b6673; }
 
 .rv-card-score {
-  align-items: flex-start;
+  align-items: center;
   padding: 18px;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 16px;
   border: none;
 }
 .rv-card-score .rv-card-icn { flex: 0 0 auto; }
 .score-ring {
-  width: 60px; height: 60px; flex: 0 0 60px;
+  width: 56px; height: 56px; flex: 0 0 56px;
   border-radius: 50%;
   background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), #e3e7ed 0);
   display: grid; place-items: center;
 }
-.score-ring span { font-size: 1.2rem; font-weight: 800; color: var(--ink); }
-.score-ring small { font-size: .7rem; color: var(--muted); }
+.score-ring span { font-size: 1.1rem; font-weight: 800; color: var(--ink); }
+.score-ring small { font-size: .65rem; color: var(--muted); }
+.rv-card-score .rv-card-info { flex: 1; min-width: 0; }
+.rv-card-score .rv-card-num { display: none; }
+.rv-card-score .rv-card-label { font-size: .86rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
 
 .rv-card-error { border-color: #f6d9d4; background: #fdf1ef; }
 .rv-card-error .rv-card-icn { background: #f6d9d4; color: var(--error); }
