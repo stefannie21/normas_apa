@@ -232,7 +232,7 @@ function render() {
     .join("");
 
   const cuerpo = !st.ready
-    ? `<tr><td colspan="5" class="rv-vacio">Aun no se ha verificado el documento.</td></tr>`
+    ? `<tr><td colspan="5" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
     : enPagina.length
       ? enPagina.map((f) => filaHallazgo(f, lista.indexOf(f))).join("")
       : `<tr><td colspan="5" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
