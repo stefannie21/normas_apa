@@ -167,7 +167,7 @@ body {
 
 /* ---------- Panel de Inicio ---------- */
 .view-inner:has(.dash) { max-width: 1180px; }
-.dash { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; }
+.dash { display: flex; flex-direction: column; gap: 18px; }
 .dash-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dash-side { display: flex; flex-direction: column; gap: 16px; }
 
