@@ -156,6 +156,31 @@ function filaHallazgo(f, indice) {
     </tr>`;
 }
 
+function nivel(score) {
+  if (score == null) return { txt: "Sin datos", clase: "none" };
+  if (score >= 75) return { txt: "Alto", clase: "alto" };
+  if (score >= 50) return { txt: "Medio", clase: "medio" };
+  return { txt: "Bajo", clase: "bajo" };
+}
+
+/* El anillo avanza segun el cumplimiento. El valor viaja como variable CSS
+   para no repintar bordes desde JS. */
+function pintarAnillo(score) {
+  const ring = document.querySelector(".score-ring");
+  if (!ring) return;
+  const pct = score == null ? 0 : Math.max(0, Math.min(100, Number(score) || 0));
+  ring.style.setProperty("--pct", String(pct));
+  const color =
+    score == null
+      ? "var(--accent-soft)"
+      : pct < 50
+        ? "var(--error)"
+        : pct < 75
+          ? "var(--warning)"
+          : "var(--accent)";
+  ring.style.setProperty("--ring-color", color);
+}
+
 function render() {
   const st = estado();
   const lista = st.findings || [];

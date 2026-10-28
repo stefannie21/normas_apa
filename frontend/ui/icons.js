@@ -65,6 +65,10 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     idea: '<path d="M13 2L3 14h9l1 8 10-12z"/>',
     more: '<circle cx="12" cy="12" r="1"/><circle cx="17" cy="12" r="1"/><circle cx="7" cy="12" r="1"/>',
+    mapPin: '<path d="M21 10c0 7-3 9-3 9H3c0-7 3-9 3-9 0-4-1-8-3-8 0 4 1 8 3 8z"/><circle cx="12" cy="10" r="3"/>',
+    fix: '<path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/><path d="M4 6h5"/><path d="M4 10h4"/>',
+    info: '<path d="M12 12V8M12 17l2 2M12 17l-2 2M12 4h.01"/>',
+    error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
   };
 
   function svg(name) {
