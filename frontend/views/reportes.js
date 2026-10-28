@@ -4,19 +4,17 @@
    completa. Los datos salen del editor (app.report()), que es quien analiza; la
    vista no calcula nada por su cuenta salvo el filtro por gravedad, el filtro
    por categoria, la busqueda y la paginacion.
- */
+*/
 import { Router } from "../core/router.js";
 import { Dom } from "../core/dom.js";
 
 const { esc, icon } = Dom;
 
-// Se usan letras y no iconos: "!" para lo que rompe la norma y "i" para lo
-// que solo conviene mirar.
-const SEV_ICON = { error: "!", warning: "!", info: "i" };
 const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
 const SEV_COLOR = { error: "#e53e3e", warning: "#d69e2e", info: "#3182ce" };
+const SEV_ICON = { error: "error", warning: "alert", info: "info" };
 
-const POR_PAGINA = 10;
+const POR_PAGINA = 6;
 
 let root = null;
 let app = null;
@@ -36,41 +34,6 @@ function contar(list) {
   return c;
 }
 
-/* El anillo avanza segun el cumplimiento. El valor viaja como variable CSS
-   para no repintar bordes desde JS. */
-function pintarAnillo(score) {
-  const ring = document.querySelector(".score-ring");
-  if (!ring) return;
-  const pct = score == null ? 0 : Math.max(0, Math.min(100, Number(score) || 0));
-  ring.style.setProperty("--pct", String(pct));
-  const color =
-    score == null
-      ? "var(--accent-soft)"
-      : pct < 50
-        ? "var(--error)"
-        : pct < 75
-          ? "var(--warning)"
-          : "var(--accent)";
-  ring.style.setProperty("--ring-color", color);
-}
-
-function nivel(score) {
-  if (score == null) return { txt: "Sin datos", clase: "none" };
-  if (score >= 75) return { txt: "Alto", clase: "alto" };
-  if (score >= 50) return { txt: "Medio", clase: "medio" };
-  return { txt: "Bajo", clase: "bajo" };
-}
-
-/* Una tarjeta de conteo: icono circular, numero y etiqueta. */
-function tarjeta(clase, icono, valor, texto) {
-  return `<div class="rv-card ${clase}">
-      <span class="rv-card-icn">${icono}</span>
-      <div class="pc-num">${esc(valor)}</div>
-      <div class="pc-label">${esc(texto)}</div>
-    </div>`;
-}
-
-/* Buscar sin tildes: "sangria" debe encontrar "sangria" y "sangria". */
 function sinTildes(texto) {
   return String(texto || "")
     .normalize("NFKD")
@@ -99,7 +62,6 @@ function visibles(lista) {
   );
 }
 
-/* Ventana de paginas: 1 2 3 4 5 ... 160 (con la actual resaltada). */
 function listaPaginas(total, actual) {
   if (total <= 1) return [1];
   const out = [];
@@ -127,37 +89,54 @@ function paginacion(total, actual) {
     .join("");
   return `<div class="rv-pages">
       <button data-pag="${actual - 1}" class="rv-pg-arrow" ${actual <= 1 ? "disabled" : ""}
-        aria-label="Pagina anterior">${icon("chevron")}</button>
+        aria-label="Pagina anterior">&#10094;</button>
       ${botones}
       <button data-pag="${actual + 1}" class="rv-pg-arrow next" ${actual >= total ? "disabled" : ""}
-        aria-label="Pagina siguiente">${icon("chevron")}</button>
+        aria-label="Pagina siguiente">&#10095;</button>
     </div>`;
 }
 
-function hallazgo(f, indice) {
+/* Icono de severidad inline */
+function sevChip(sev) {
+  const color = SEV_COLOR[sev] || "#9aa5b1";
+  const label = SEV_TEXT[sev] || sev;
+  const svgName = SEV_ICON[sev] || "info";
+  return `<span class="rv-sev-chip" style="--c:${color}">${icon(svgName)} ${esc(label)}</span>`;
+}
+
+function filaHallazgo(f, indice) {
   const sev = f.severity || "info";
   const color = SEV_COLOR[sev] || "#9aa5b1";
-  const pag = String(f.location || "").match(/[Pp][áa]g\.?\s*([\d]+)/);
-  const ubic = pag ? `Pág. ${esc(pag[1])}` : esc(f.location || "");
-  const extra = f.extra || {};
   const regla = esc(f.rule_id || "");
+  const categoriaTexto = esc(f.category || "");
+  const mensaje = esc(f.message || "");
+  const excerpt = f.excerpt ? `<div class="rv-excerpt">"${esc(f.excerpt)}"</div>` : "";
+  const sugerencia = f.suggestion
+    ? `<div class="rv-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> ${esc(f.suggestion)}</div>`
+    : "";
+  const pag = String(f.location || "").match(/[Pp][áa]g\.?\s*([\d]+)/);
+  const ubic = pag ? `Párrafo ${esc(pag[1])}` : esc(f.location || "");
+
   return `<tr class="rv-row rv-${sev}" data-i="${indice}">
       <td class="rv-tipo">
-        <span class="rv-sev-dot" style="background:${color}"></span>
-        <span class="rv-sev-label">${SEV_TEXT[sev]}</span>
+        ${sevChip(sev)}
       </td>
       <td class="rv-desc">
-        <div class="rv-desc-titulo">${esc(f.category || "")} · ${regla}</div>
-        <div class="rv-desc-texto">${esc(f.message || "")}</div>
-        ${f.excerpt ? `<div class="rv-excerpt">"${esc(f.excerpt)}"</div>` : ""}
+        <div class="rv-desc-titulo">${categoriaTexto} ${regla ? `<span class="rv-regla">${esc(regla)}</span>` : ""}</div>
+        <div class="rv-desc-texto">${mensaje}</div>
+        ${excerpt}
+        ${sugerencia}
       </td>
-      <td class="rv-ubi">${esc(ubic)}</td>
+      <td class="rv-ubi">
+        <div class="rv-ubi-icono">${icon("mapPin")}</div>
+        <div class="rv-ubi-texto">${ubic}</div>
+      </td>
       <td class="rv-prio">
         <span class="rv-prio-chip rv-prio-${sev}">${SEV_TEXT[sev]}</span>
       </td>
       <td class="rv-acc">
         <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver">${icon("eye")}</button>
-        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Más">${icon("more")}</button>
+        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Mas opciones">${icon("more")}</button>
         <div class="rv-more-pop" id="rv-pop-${indice}" hidden>
           <button class="rv-pop-item" data-act="corregir" data-i="${indice}">${icon("fix")} Corregir</button>
           <button class="rv-pop-item" data-act="descartar" data-i="${indice}">${icon("xCircle")} Descartar</button>
@@ -174,7 +153,6 @@ function render() {
     st.summary && st.summary.compliance_score != null
       ? st.summary.compliance_score
       : null;
-  const nivelTxt = nivel(score);
 
   const filtrada = visibles(lista);
   const totalPaginas = Math.max(1, Math.ceil(filtrada.length / POR_PAGINA));
@@ -183,7 +161,7 @@ function render() {
   const desde = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrada.slice(desde, desde + POR_PAGINA);
 
-  // chips de estado en el header
+  // Chips de estado en el header (como la imagen)
   const chips = [
     ["all", "Todos", cuentas.all || 0, "var(--accent)"],
     ["error", "Errores", cuentas.error || 0, "var(--error)"],
@@ -199,14 +177,17 @@ function render() {
     .join("");
 
   const cuerpo = !st.ready
-    ? `<tr><td colspan="5" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
+    ? `<tr><td colspan="5" class="rv-vacio">Aun no se ha verificado el documento.</td></tr>`
     : enPagina.length
-      ? enPagina.map((f) => hallazgo(f, lista.indexOf(f))).join("")
+      ? enPagina.map((f) => filaHallazgo(f, lista.indexOf(f))).join("")
       : `<tr><td colspan="5" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
+
+  const inicioRango = filtrada.length ? desde + 1 : 0;
+  const finRango = Math.min(desde + POR_PAGINA, filtrada.length);
 
   const pie = st.ready
     ? `<div class="rv-foot">
-        <span class="rv-count">Mostrando ${filtrada.length ? desde + 1 : 0} de ${filtrada.length} hallazgos${
+        <span class="rv-count">Mostrando ${inicioRango} - ${finRango} de ${filtrada.length} hallazgos${
           filtrada.length !== lista.length ? ` (de ${lista.length})` : ""
         }</span>
         ${paginacion(totalPaginas, pagina)}
@@ -215,85 +196,62 @@ function render() {
 
   return `
     <div class="rv-view">
-      <div class="rv-head">
-        <span class="rv-head-icn">${icon("chart")}</span>
-        <div>
-          <h1>Reportes</h1>
-          <p>Resumen del cumplimiento y el detalle de los hallazgos del documento.</p>
+      <div class="rv-toolbar">
+        <div class="rv-search-wrap">
+          <span class="rv-search-icn">${icon("search")}</span>
+          <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
+            value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
         </div>
-        <div class="rv-head-acc">
-          <div class="rv-header-chips">${chips}</div>
-          <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
-            title="Descargar el informe APA en un documento Word (.docx)"
-            aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
+        <div class="rv-select-wrap">
+          <label class="rv-select-lbl">Tipo de hallazgo</label>
+          <select id="rv-tipo" aria-label="Tipo de hallazgo">
+            <option value="">Todos</option>
+            <option value="error">Error</option>
+            <option value="warning">Aviso</option>
+            <option value="info">Observacion</option>
+          </select>
         </div>
+        <div class="rv-select-wrap">
+          <label class="rv-select-lbl">Prioridad</label>
+          <select id="rv-prioridad" aria-label="Prioridad">
+            <option value="">Todas</option>
+            <option value="error">Alta</option>
+            <option value="warning">Media</option>
+            <option value="info">Baja</option>
+          </select>
+        </div>
+        <button class="rv-btn-limpiar" data-act="limpiar">${icon("xCircle")} Limpiar filtros</button>
       </div>
 
-      <div class="pane-body">
-        <div class="rv-toolbar">
-          <div class="rv-search-wrap">
-            <span class="rv-search-icn">${icon("search")}</span>
-            <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
-              value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
-          </div>
-          <div class="rv-select-wrap">
-            <label class="rv-select-lbl">Tipo de hallazgo</label>
-            <select id="rv-tipo" aria-label="Tipo de hallazgo">
-              <option value="">Todos</option>
-              <option value="error">Error</option>
-              <option value="warning">Aviso</option>
-              <option value="info">Observación</option>
-            </select>
-          </div>
-          <div class="rv-select-wrap">
-            <label class="rv-select-lbl">Prioridad</label>
-            <select id="rv-prioridad" aria-label="Prioridad">
-              <option value="">Todas</option>
-              <option value="error">Alta</option>
-              <option value="warning">Media</option>
-              <option value="info">Baja</option>
-            </select>
-          </div>
-          <button class="rv-btn-limpiar" data-act="limpiar">${icon("xCircle")} Limpiar filtros</button>
-        </div>
-
-        <div class="rv-tablewrap">
-          <table class="rv-table">
-            <thead>
-              <tr>
-                <th scope="col">Tipo</th>
-                <th scope="col">Descripción del hallazgo</th>
-                <th scope="col">Ubicación</th>
-                <th scope="col">Prioridad</th>
-                <th scope="col" class="rv-acc-col">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="rv-body">${cuerpo}</tbody>
-          </table>
-        </div>
-        ${pie}
+      <div class="rv-head-acc">
+        <div class="rv-header-chips">${chips}</div>
+        <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
+          title="Descargar el informe APA en un documento Word (.docx)"
+          aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
       </div>
+
+      <div class="rv-tablewrap">
+        <table class="rv-table">
+          <thead>
+            <tr>
+              <th scope="col">Tipo</th>
+              <th scope="col">Descripcion del hallazgo</th>
+              <th scope="col">Ubicacion</th>
+              <th scope="col">Prioridad</th>
+              <th scope="col" class="rv-acc-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="rv-body">${cuerpo}</tbody>
+        </table>
+      </div>
+      ${pie}
     </div>`;
-}
-
-function contarCategorias(lista) {
-  const c = new Map();
-  lista.forEach((f) => {
-    const k = f.category || "Sin categoría";
-    c.set(k, (c.get(k) || 0) + 1);
-  });
-  return Array.from(c.entries()).sort((a, b) => b[1] - a[1]);
 }
 
 function mount(el) {
   root = el;
-  pintarAnillo(
-    (estado().summary && estado().summary.compliance_score) != null
-      ? estado().summary.compliance_score
-      : null
-  );
 
-  // chips de severidad del header
+  // Chips de severidad del header
   el.querySelectorAll(".rv-chip[data-filter]").forEach((b) =>
     b.addEventListener("click", () => {
       filtro = b.dataset.filter;
@@ -302,7 +260,7 @@ function mount(el) {
     })
   );
 
-  // buscador
+  // Buscador
   const busquedaEl = el.querySelector(".rv-search");
   if (busquedaEl) {
     busquedaEl.addEventListener("input", (e) => {
@@ -312,7 +270,7 @@ function mount(el) {
     });
   }
 
-  // filtro tipo de hallazgo
+  // Filtro tipo de hallazgo
   const tipoEl = el.querySelector("#rv-tipo");
   if (tipoEl) {
     tipoEl.addEventListener("change", (e) => {
@@ -322,7 +280,7 @@ function mount(el) {
     });
   }
 
-  // filtro prioridad (mapea a severidad)
+  // Filtro prioridad (mapea a severidad)
   const prioEl = el.querySelector("#rv-prioridad");
   if (prioEl) {
     prioEl.addEventListener("change", (e) => {
@@ -333,7 +291,7 @@ function mount(el) {
     });
   }
 
-  // limpiar filtros
+  // Limpiar filtros
   el.querySelectorAll("[data-act=limpiar]").forEach((b) =>
     b.addEventListener("click", () => {
       filtro = "all";
@@ -349,7 +307,7 @@ function mount(el) {
     })
   );
 
-  // paginacion
+  // Paginacion
   el.querySelectorAll(".rv-pages [data-pag]").forEach((b) =>
     b.addEventListener("click", () => {
       const n = Number(b.dataset.pag);
@@ -361,7 +319,7 @@ function mount(el) {
     })
   );
 
-  // acciones de filas: ver / mas
+  // Acciones de filas: ver / mas
   el.querySelectorAll(".rv-iconbtn[data-act]").forEach((b) =>
     b.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -379,7 +337,7 @@ function mount(el) {
     })
   );
 
-  // items del menu mas
+  // Items del menu mas
   el.querySelectorAll(".rv-pop-item[data-act]").forEach((b) =>
     b.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -389,37 +347,33 @@ function mount(el) {
       if (!f) return;
       if (b.dataset.act === "corregir") {
         if (app && app.openFixModal) app.openFixModal();
-        // TODO: pre-seleccionar el hallazgo en el modal de correccion
       } else if (b.dataset.act === "descartar") {
-        // TODO: descartar hallazgo (marcar como resuelto)
         if (app && app.toast) app.toast("Hallazgo descartado", "ok");
         document.getElementById(`rv-pop-${i}`).hidden = true;
       }
     })
   );
 
-  // cerrar pop al hacer click fuera
+  // Cerrar pop al hacer click fuera
   document.addEventListener("click", () => {
     document.querySelectorAll(".rv-more-pop").forEach((m) => m.hidden = true);
   });
 
-  // acciones globales
+  // Acciones globales
   el.querySelectorAll("[data-act]").forEach((b) => {
-    if (b.closest(".rv-iconbtn, .rv-pop-item")) return; // ya manejados arriba
+    if (b.closest(".rv-iconbtn, .rv-pop-item")) return;
     b.addEventListener("click", () => {
       const act = b.dataset.act;
       if (act === "volver") Router.go("correcciones");
       else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
-    })
+    });
   });
 }
 
-// Repinta sin perder la posicion del scroll: el editor avisa de cada cambio.
 function pintar() {
   if (!root) return;
   const vista = document.getElementById("view");
   const scroll = vista ? vista.scrollTop : 0;
-  // al escribir en el buscador se repinta todo: se devuelve el foco al campo
   const activo = document.activeElement;
   const enBusqueda = activo && activo.classList && activo.classList.contains("rv-search");
   const pos = enBusqueda ? activo.selectionStart : null;
