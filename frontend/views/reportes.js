@@ -34,17 +34,6 @@ function contar(list) {
   return c;
 }
 
-function tarjeta(clase, icono, valor, texto, subtexto) {
-  return `<div class="rv-card ${clase}">
-      <span class="rv-card-icn">${icono}</span>
-      <div class="rv-card-info">
-        <div class="rv-card-num">${esc(valor)}</div>
-        <div class="rv-card-label">${esc(texto)}</div>
-        ${subtexto ? `<div class="rv-card-sub">${esc(subtexto)}</div>` : ""}
-      </div>
-    </div>`;
-}
-
 function sinTildes(texto) {
   return String(texto || "")
     .normalize("NFKD")
@@ -107,7 +96,6 @@ function paginacion(total, actual) {
     </div>`;
 }
 
-/* Icono de severidad inline */
 function sevChip(sev) {
   const color = SEV_COLOR[sev] || "#9aa5b1";
   const label = SEV_TEXT[sev] || sev;
@@ -181,6 +169,17 @@ function pintarAnillo(score) {
   ring.style.setProperty("--ring-color", color);
 }
 
+function tarjeta(clase, icono, valor, texto, subtexto) {
+  return `<div class="rv-card ${clase}">
+      <span class="rv-card-icn">${icono}</span>
+      <div class="rv-card-info">
+        <div class="rv-card-num">${esc(valor)}</div>
+        <div class="rv-card-label">${esc(texto)}</div>
+        ${subtexto ? `<div class="rv-card-sub">${esc(subtexto)}</div>` : ""}
+      </div>
+    </div>`;
+}
+
 function render() {
   const st = estado();
   const lista = st.findings || [];
@@ -197,7 +196,7 @@ function render() {
   const desde = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrada.slice(desde, desde + POR_PAGINA);
 
-  // Chips de estado en el header (como la imagen)
+  // Chips de estado (como la imagen de referencia)
   const chips = [
     ["all", "Todos", cuentas.all || 0, "var(--accent)"],
     ["error", "Errores", cuentas.error || 0, "var(--error)"],
@@ -232,6 +231,73 @@ function render() {
 
   return `
     <div class="rv-view">
+      <div class="rv-head">
+        <span class="rv-head-icn">${icon("chart")}</span>
+        <div>
+          <h1>Reportes</h1>
+          <p>Revise los hallazgos, el porcentaje de cumplimiento y el detalle de cada correccion.</p>
+        </div>
+        <div class="rv-head-search">
+          <span class="rv-search-icn">${icon("search")}</span>
+          <input class="rv-search-header" type="search" placeholder="Buscar tesis, autor o codigo..."
+            value="${esc(busqueda)}" aria-label="Buscar tesis, autor o codigo">
+        </div>
+        <div class="rv-head-actions">
+          <span class="rv-notif">${icon("bell")}</span>
+          <div class="rv-user">
+            <span class="rv-user-icn">${icon("docs")}</span>
+            <div>
+              <div class="rv-user-name">Josi Maza</div>
+              <div class="rv-user-email">josimaza21@gmail.com</div>
+            </div>
+            <span class="rv-user-arrow">&#9660;</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjetas de estadisticas -->
+      <div class="rv-cards">
+        ${tarjeta("rv-card-score",
+          `<div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>`,
+          esc(score == null ? "--" : score),
+          "Nivel de cumplimiento APA",
+          score == null ? "Su documento tiene un bajo avance." : `Su documento tiene un ${nivel(score).txt.toLowerCase()} avance.`
+        )}
+        ${tarjeta("rv-card-error",
+          `<span class="rv-sev-chip rv-sev-error">${icon("error")} Error</span>`,
+          cuentas.error || 0,
+          "Errores",
+          "Requieren correccion"
+        )}
+        ${tarjeta("rv-card-warning",
+          `<span class="rv-sev-chip rv-sev-warning">${icon("alert")} Aviso</span>`,
+          cuentas.warning || 0,
+          "Avisos",
+          "Revisar y validar"
+        )}
+        ${tarjeta("rv-card-info",
+          `<span class="rv-sev-chip rv-sev-info">${icon("info")} Observacion</span>`,
+          cuentas.info || 0,
+          "Observaciones",
+          "Informacion adicional"
+        )}
+        ${tarjeta("rv-card-total",
+          icon("clipboard"),
+          cuentas.all || 0,
+          "Total de hallazgos",
+          "En todo el documento"
+        )}
+      </div>
+
+      <!-- Chips de filtro + descargar -->
+      <div class="rv-filtros-bar">
+        <div class="rv-header-chips">${chips}</div>
+        <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
+          title="Descargar el informe APA en un documento Word (.docx)"
+          aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
+      </div>
+
+      <!-- Barra de filtros -->
       <div class="rv-toolbar">
         <div class="rv-search-wrap">
           <span class="rv-search-icn">${icon("search")}</span>
@@ -259,46 +325,7 @@ function render() {
         <button class="rv-btn-limpiar" data-act="limpiar">${icon("xCircle")} Limpiar filtros</button>
       </div>
 
-      <div class="rv-head-acc">
-        <div class="rv-header-chips">${chips}</div>
-        <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
-          title="Descargar el informe APA en un documento Word (.docx)"
-          aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
-      </div>
-
-      <div class="rv-cards">
-        ${tarjeta("rv-card-score",
-          `<div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>`,
-          esc(score == null ? "--" : score),
-          "Nivel de cumplimiento",
-          score == null ? "Sin datos" : `Tu documento tiene un ${nivel(score).txt.toLowerCase()} avance.`
-        )}
-        ${tarjeta("rv-card-error",
-          `<span class="rv-sev-chip rv-sev-error">${icon("error")} Error</span>`,
-          cuentas.error || 0,
-          "Errores",
-          "Requieren corrección"
-        )}
-        ${tarjeta("rv-card-warning",
-          `<span class="rv-sev-chip rv-sev-warning">${icon("alert")} Aviso</span>`,
-          cuentas.warning || 0,
-          "Avisos",
-          "Revisar y validar"
-        )}
-        ${tarjeta("rv-card-info",
-          `<span class="rv-sev-chip rv-sev-info">${icon("info")} Observación</span>`,
-          cuentas.info || 0,
-          "Observaciones",
-          "Información adicional"
-        )}
-        ${tarjeta("rv-card-total",
-          icon("clipboard"),
-          cuentas.all || 0,
-          "Total de hallazgos",
-          "En todo el documento"
-        )}
-      </div>
-
+      <!-- Tabla CRUD -->
       <div class="rv-tablewrap">
         <table class="rv-table">
           <thead>
