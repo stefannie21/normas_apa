@@ -1976,10 +1976,9 @@ body.reading #page { cursor: default; }
 .rv-count { font-size: .8rem; color: var(--muted); }
 
 /* ocultar los componentes antiguos que ya no se usan en esta vista */
-.rv-cards, .rv-catbar, .rv-filters-btn, .findings, .finding, .finding-rail, .finding-body,
+.rv-cats, .rv-catbar, .rv-filters-btn, .findings, .finding, .finding-rail, .finding-body,
 .finding-side, .finding-cat, .finding-msg, .finding-excerpt, .finding-sug, .finding-page,
-.finding-sev, .finding-head, .rv-card, .rv-card-score, .score-ring, .rv-score-txt,
-.rv-score-title, .rv-level, .rv-card-icn, .rv-back { display: none !important; }
+.finding-sev, .finding-head, .rv-back { display: none !important; }
 
 /* ---------- Reportes: vista tabla CRUD (identico a referencia) ---------- */
 .rv-view { max-width: none; }
@@ -2298,10 +2297,9 @@ body.reading #page { cursor: default; }
 .rv-pg-arrow svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
 
 /* Ocultar componentes antiguos de la vista previa que ya no se usan */
-.rv-cards, .rv-catbar, .rv-filters-btn, .findings, .finding, .finding-rail, .finding-body,
+.rv-cats, .rv-catbar, .rv-filters-btn, .findings, .finding, .finding-rail, .finding-body,
 .finding-side, .finding-cat, .finding-msg, .finding-excerpt, .finding-sug, .finding-page,
-.finding-sev, .finding-head, .rv-card, .rv-card-score, .score-ring, .rv-score-txt,
-.rv-score-title, .rv-level, .rv-card-icn, .rv-back { display: none !important; }
+.finding-sev, .finding-head, .rv-back { display: none !important; }
 
 /* ---------- Tarjetas de estadísticas (Reportes) ---------- */
 .rv-cards {
