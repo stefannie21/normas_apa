@@ -47,6 +47,8 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     ruler: '<rect x="3" y="8" width="18" height="8" rx="1"/><line x1="7" y1="8" x2="7" y2="12"/><line x1="11" y1="8" x2="11" y2="13"/><line x1="15" y1="8" x2="15" y2="12"/><line x1="19" y1="8" x2="19" y2="13"/>',
     pilcrow: '<path d="M13 4v16"/><path d="M9 4h8"/><path d="M9 4a4 4 0 0 0 0 8h4"/>',
     paint: '<path d="M5 9a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v1H5z"/><path d="M12 10v6"/><rect x="10" y="16" width="4" height="5" rx="1"/>',
+    /* Tacho de basura: tapa, asa, cuerpo y dos ranuras. Se usa para eliminar. */
+    trash: '<path d="M4 7h16"/><path d="M9.6 7V5.4A1.4 1.4 0 0 1 11 4h2a1.4 1.4 0 0 1 1.4 1.4V7"/><path d="M6.2 7l.9 11.6a1.8 1.8 0 0 0 1.8 1.6h6.2a1.8 1.8 0 0 0 1.8-1.6L17.8 7"/><path d="M10.4 11v5.6"/><path d="M13.6 11v5.6"/>',
     /* Iconos del menu lateral */
     home: '<path d="M4 11.2 12 4l8 7.2"/><path d="M6 10v9.5h12V10"/><path d="M10 19.5v-5h4v5"/>',
     stack: '<path d="M8 3h9l-3 3.6"/><path d="M8 3 3 8.2l3 3.6"/><path d="M3 8.2v4.4l5 5 5-5V8.2"/><path d="M8 17.6v3.6l5 2.4 5-2.4v-3.6"/><path d="M13 17.6v3.6"/>',
@@ -58,6 +60,21 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     filter: '<path d="M3.5 5h17l-6.6 7.8V19l-3.8 2v-8.2z"/>',
     bulb: '<path d="M9.5 18.5h5"/><path d="M10.5 21.5h3"/><path d="M12 3a5.8 5.8 0 0 0-3.4 10.6c.5.4.8 1 .9 1.6h5c.1-.6.4-1.2.9-1.6A5.8 5.8 0 0 0 12 3z"/>',
     xCircle: '<circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>',
+    pending: '<path d="M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9z"/><path d="M12 7v4M12 17l2 2M12 17l-2 2"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    idea: '<path d="M13 2L3 14h9l1 8 10-12z"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="17" cy="12" r="1"/><circle cx="7" cy="12" r="1"/>',
+    mapPin: '<path d="M21 10c0 7-3 9-3 9H3c0-7 3-9 3-9 0-4-1-8-3-8 0 4 1 8 3 8z"/><circle cx="12" cy="10" r="3"/>',
+    fix: '<path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M14 6l3 3"/><path d="M4 6h5"/><path d="M4 10h4"/>',
+    info: '<path d="M12 12V8M12 17l2 2M12 17l-2 2M12 4h.01"/>',
+    /* "i" dentro de un circulo, para la etiqueta de observacion */
+    infoCircle: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="11.2" x2="12" y2="16.4"/><circle cx="12" cy="7.8" r="1.1"/>',
+    /* tres puntos verticales: menu de acciones de cada fila */
+    moreV: '<circle cx="12" cy="5.6" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.4" r="1.3"/>',
+    /* etiqueta de regla (Regla APA 7.2) */
+    tag: '<path d="M20.6 12.6 12.4 20.8a1.6 1.6 0 0 1-2.3 0L3.4 14a1.6 1.6 0 0 1-.5-1.2V4.6a1.6 1.6 0 0 1 1.6-1.6h8.2c.4 0 .9.2 1.2.5l6.7 6.7a1.6 1.6 0 0 1 0 2.4z"/><circle cx="7.8" cy="7.8" r="1.5"/>',
+    error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
   };
 
   function svg(name) {

@@ -11,7 +11,7 @@ import "./views/ajustes.js";
 
 App.onChange(() => Router.refresh());
 Sidebar.init();
-// Se arranca en "Editar documento": el documento abierto es el area de trabajo
-// y las otras secciones (Inicio, Mis tesis, Reportes) quedan a un clic.
-Router.init(App, "correcciones");
+// Se arranca en "Inicio": el panel de situación es la primera pantalla y el
+// documento abierto queda a un clic en "Correcciones".
+Router.init(App, "inicio");
 Icons.hydrate(document);

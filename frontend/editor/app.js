@@ -1,4 +1,4 @@
-/* Logica principal: carga de .docx, edicion y analisis APA. */
+﻿/* Logica principal: carga de .docx, edicion y analisis APA. */
 import { Pager } from "./pager.js";
 import { Commands } from "./commands.js";
 import { Marker } from "./marker.js";
@@ -14,12 +14,36 @@ const App = (function () {
   const SEVERITY_ICON = { error: "!", warning: "!", info: "i" };
   const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
 
+  // Version del HTML que produce el conversor (mammoth + enrichHtml). Se sube
+  // cuando cambia algo en la conversion para que las sesiones ya guardadas en
+  // el navegador se vuelvan a generar en vez de reutilizar el HTML antiguo.
+  //  1: sin conservar los parrafos vacios del .docx
+  //  2: los conserva (portadas que se empujan con lineas en blanco)
+  //  3: los vacios miden lo que su marca de parrafo y las imagenes flotantes
+  //     dejan de ocupar altura (portada con logo anclado)
+  const FLOW_VERSION = 3;
+
   const page = document.getElementById("page");
   const emptyState = document.getElementById("empty-state");
   const fileInput = document.getElementById("file");
   const docName = document.getElementById("doc-name");
   const analyzeBtn = document.getElementById("analyze-btn");
-  const openBtn = document.getElementById("open-btn");
+
+  /* ---------- Barra de acciones rápida ---------- */
+  function isEditDocument() {
+    return Router.current() === "correcciones";
+  }
+
+  function updateQuickActions() {
+    const edit = isEditDocument();
+    // La barra de tareas (titulo del archivo + acciones rápidas) solo se
+    // muestra cuando estamos editando un documento. En el resto de secciones
+    // (Inicio, Mis tesis, Reportes, Ajustes) se oculta por completo.
+    if (titlebar) titlebar.hidden = !edit;
+    if (quickActions) quickActions.hidden = !edit;
+  }
+  const quickActions = document.getElementById("quick-actions");
+  const titlebar = document.querySelector(".titlebar");
   const emptyOpen = document.getElementById("empty-open");
   const statusMsg = document.getElementById("status-msg");
   const statusWords = document.getElementById("status-words");
@@ -55,6 +79,7 @@ const App = (function () {
     "ai-revoke": revokeAiConsent,
     "fix-doc": openFixModal,
     "toggle-pane": () => togglePane(),
+    orientacion: () => openOrientModal(),
     "clear-marks": clearMarks,
     "page-break": () => {
       insertHtml('<div class="page-break"></div>');
@@ -64,13 +89,13 @@ const App = (function () {
     image: pickImage,
     link: insertLink,
     reading: toggleReading,
+    "pdf-view": togglePdfView,
     "apa-defaults": applyApaDefaults,
     repaginate: repaginate,
     "toggle-ruler": () => document.body.classList.toggle("show-ruler"),
   });
 
   /* ---------- Archivo ---------- */
-  openBtn.addEventListener("click", () => fileInput.click());
   emptyOpen.addEventListener("click", () => fileInput.click());
   analyzeBtn.addEventListener("click", () => runAnalysis());
   fileInput.addEventListener("change", () => {
@@ -178,8 +203,14 @@ const App = (function () {
         if (!info) return;
 
         if (info.align && info.align !== "left") el.style.textAlign = info.align;
-        if (info.sb != null) el.style.marginTop = info.sb + "pt";
-        if (info.sa != null) el.style.marginBottom = info.sa + "pt";
+        // Espaciado "automático" de Word: con la casilla Auto puesta, Word
+        // ignora el número y pone 14 pt (medido en Word para el cuerpo de
+        // 12 pt). Si no se aplica, el párrafo sube 9 pt respecto al de arriba.
+        const auto = Math.max(14, (info.size || 12) * 1.15);
+        if (info.ab) el.style.marginTop = auto + "pt";
+        else if (info.sb != null) el.style.marginTop = info.sb + "pt";
+        if (info.aa) el.style.marginBottom = auto + "pt";
+        else if (info.sa != null) el.style.marginBottom = info.sa + "pt";
         if (info.size) el.style.fontSize = info.size + "pt";
         // el factor se calcula con la FUENTE DEL DOCUMENTO (Arial en este caso)
         // y no con la que hereda el parrafo, que seria la de la interfaz
@@ -200,9 +231,51 @@ const App = (function () {
       // El orden del backend es el mismo en que mammoth emite los <img>.
       const imgs = Array.from(tmp.querySelectorAll("img"));
       (meta.images || []).forEach((s, i) => {
-        if (!imgs[i] || !s) return;
-        imgs[i].setAttribute("data-docx-w", s.width_cm);
-        imgs[i].setAttribute("data-docx-h", s.height_cm);
+        const img = imgs[i];
+        if (!img || !s) return;
+        img.setAttribute("data-docx-w", s.width_cm);
+        img.setAttribute("data-docx-h", s.height_cm);
+        if (s.width_cm) img.style.width = s.width_cm + "cm";
+        if (s.height_cm) img.style.height = s.height_cm + "cm";
+
+        // Imagen FLOTANTE: en Word está anclada a un punto de la página y NO
+        // ocupa altura de línea; el texto sigue como si no estuviera. Si se
+        // pinta como imagen normal, el párrafo crece lo que mida la figura y
+        // todo lo que viene detrás baja. En la portada el logo mide 78 pt y
+        // Word le da 0: por eso la portada salía empujada media hoja.
+        if (!s.anchored) return;
+        const holder = img.parentElement;
+        if (!holder) return;
+        holder.style.position = "relative";
+        // El párrafo que solo lleva la imagen anclada sigue siendo UNA línea en
+        // Word (la de su marca de párrafo). Al sacar la imagen del flujo se
+        // queda sin contenido y mediría 0: se le devuelve esa línea.
+        if (!holder.textContent.replace(/\u00a0/g, " ").trim()) {
+          holder.style.minHeight = "1.15em";
+        }
+        img.style.position = "absolute";
+        img.style.left = (s.offset_h_pt || 0) + "pt";
+        img.style.top = (s.offset_v_pt || 0) + "pt";
+        img.style.margin = "0";
+        img.style.zIndex = s.behind ? "0" : "3";
+        img.setAttribute("data-anchored", "1");
+      });
+
+      // Alto real de los párrafos vacíos: lo fija el tamaño de su marca de
+      // párrafo, no el del texto (que no hay). Los espaciadores de la portada
+      // escritos con la marca a 18 pt miden 20.7 pt en Word; pintados con los
+      // 12 pt por defecto miden 13.8 pt y el bloque de abajo sube 7 pt cada
+      // uno. Se emparejan por orden con los <p> en blanco del flujo.
+      const blanks = blocks.filter(
+        (el) =>
+          /^P$/i.test(el.tagName) &&
+          !el.querySelector("img") &&
+          !el.closest("td,th") &&
+          !el.textContent.replace(/\u00a0/g, " ").trim()
+      );
+      (meta.empty_marks || []).forEach((pt, i) => {
+        if (pt == null || !blanks[i]) return;
+        blanks[i].style.fontSize = pt + "pt";
       });
 
       const out = tmp.innerHTML;
@@ -217,6 +290,62 @@ const App = (function () {
     const f = String(name || "").trim();
     if (!f) return "";
     return /[a-zA-Z]/.test(f) && !/^["']/.test(f) && !/,/.test(f) ? "'" + f.replace(/'/g, "") + "'" : f;
+  }
+
+  /* mammoth BORRA los parrafos vacios del .docx, y en Word son espaciadores de
+     verdad: las portadas de tesis se empujan hacia abajo con ellos. Al quitarlos
+     la portada salia hasta 3 pulgadas mas corta que en Word: las lineas se
+     apelotonaban arriba y el "2026" del pie subia de sitio (o se caia a la hoja
+     siguiente si el resto del texto lo empujaba).
+     El modelo de documento de mammoth SI conserva esos parrafos (solo los
+     descarta al generar el HTML), asi que aqui se les anade un espacio duro: el
+     generador emite <p>&nbsp;</p> y la linea recupera su altura. */
+  function keepEmptyParagraphs(doc) {
+    const walk = (el) => {
+      if (!el || typeof el !== "object") return;
+      if (el.type === "paragraph" && (!el.children || el.children.length === 0)) {
+        el.children = [{ type: "run", children: [{ type: "text", value: "\u00a0" }] }];
+      }
+      (el.children || []).forEach(walk);
+    };
+    walk(doc);
+    return doc;
+  }
+
+  /* Devuelve el HTML del flujo de una sesion guardada.
+     Si la sesion se creo con una version anterior del conversor, el HTML que
+     trae no tiene los arreglos posteriores (por ejemplo los parrafos vacios de
+     la portada) y el documento se veria igual que antes aunque el codigo ya
+     este corregido: se rehace la conversion desde el .docx original, que la
+     sesion guarda en `bytes`. Si no hay bytes o algo falla, se usa el guardado.
+
+     OJO: al reconvertir se parte del .docx original, asi que las ediciones
+     hechas a mano en el visor de esa sesion vieja no se conservan. Por eso
+     flowRegenerated queda marcado y restoreSession avisa al usuario. */
+  let flowRegenerated = false;
+  // la sesion es de un conversor anterior y no se pudo rehacer (no hay .docx):
+  // se queda como estaba, pero hay que decirlo en vez de dejar al usuario
+  // mirando una portada que "sigue igual" sin saber por que.
+  let flowStale = false;
+  async function flowForSession(doc) {
+    if (!doc) return "";
+    if (doc.flowVersion === FLOW_VERSION) return doc.flow || "";
+    if (!doc.bytes) {
+      flowStale = true;
+      return doc.flow || "";
+    }
+    try {
+      const result = await mammoth.convertToHtml(
+        { arrayBuffer: new Uint8Array(doc.bytes) },
+        { transformDocument: keepEmptyParagraphs }
+      );
+      const html = await enrichHtml(result.value || "<p></p>");
+      flowRegenerated = true;
+      return html;
+    } catch (e) {
+      flowStale = true;
+      return doc.flow || "";
+    }
   }
 
   // Reajusta las imagenes cuando ya han cargado. Antes se usaba el evento 'load'
@@ -255,9 +384,12 @@ const App = (function () {
     const reader = new FileReader();
     reader.onload = () => {
       mammoth
-        .convertToHtml({ arrayBuffer: reader.result })
+        .convertToHtml(
+          { arrayBuffer: reader.result },
+          { transformDocument: keepEmptyParagraphs }
+        )
         .then((result) => enrichHtml(result.value || "<p></p>"))
-        .then((html) => {
+        .then(async (html) => {
           page.innerHTML = html;
           buildIndex();
           Pager.paginate(page, docSections);
@@ -270,9 +402,18 @@ const App = (function () {
           clearMarks();
           resetReport();
           updateCounts();
+          // Si esta tesis ya se habia verificado, se recupera su ultimo informe:
+          // se puede leer al abrir sin volver a gastar una verificacion.
+          const previo = await Library.getReport(file.name);
+          const restaurado = restoreReportState(previo, true);
           // el documento que se acaba de abrir es el punto de partida
           History.reset();
-          showToast("Documento cargado. Edita y pulsa 'Verificar APA'.", "ok");
+          showToast(
+            restaurado
+              ? "Documento cargado con su ultimo informe guardado."
+              : "Documento cargado. Edita y pulsa 'Verificar APA'.",
+            "ok"
+          );
           // guardar la sesion automaticamente para que al recargar la web
           // se restaure ESTE documento y no el anterior
           saveSession(true);
@@ -286,7 +427,61 @@ const App = (function () {
     reading = !reading;
     page.contentEditable = reading ? "false" : "true";
     document.body.classList.toggle("reading", reading);
+    // Fuera de la edicion no se muestra la barra horizontal del visor: el
+    // documento puede desbordarse, pero sin barra visible.
+    canvas.classList.toggle("no-scrollbar", reading);
     showToast(reading ? "Modo lectura activado" : "Edición activada", "ok");
+  }
+
+  // Vista PDF fiel: Word convierte el .docx y se muestra el PDF en una capa.
+  // Sirve para comprobar que el contenido no se mueve respecto al archivo
+  // original. La edicion y las marcas siguen en el visor HTML.
+  async function togglePdfView() {
+    const existing = document.getElementById("pdf-overlay");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    if (!currentFile) {
+      showToast("Primero abre un documento .docx", "error");
+      return;
+    }
+    showToast("Generando vista PDF con Word...", "ok");
+    try {
+      const data = new FormData();
+      data.append("file", currentFile, currentFile.name);
+      const res = await fetch("/api/docx-pdf", { method: "POST", body: data });
+      if (!res.ok) {
+        let detail = "No se pudo generar el PDF.";
+        try {
+          const j = await res.json();
+          if (j && j.detail) detail = j.detail;
+        } catch (e) {
+          /* respuesta sin JSON */
+        }
+        showToast(detail, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const overlay = document.createElement("div");
+      overlay.id = "pdf-overlay";
+      overlay.innerHTML =
+        '<div class="pdf-overlay-bar">' +
+        '<span>Vista PDF (Word)</span>' +
+        '<button type="button" id="pdf-close" title="Cerrar">Cerrar</button>' +
+        "</div>" +
+        '<iframe id="pdf-frame" title="Vista PDF del documento"></iframe>';
+      document.body.appendChild(overlay);
+      const frame = overlay.querySelector("#pdf-frame");
+      frame.src = url;
+      frame.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+      overlay.querySelector("#pdf-close").addEventListener("click", () => {
+        overlay.remove();
+      });
+    } catch (e) {
+      showToast("No se pudo generar la vista PDF.", "error");
+    }
   }
 
   function repaginate() {
@@ -351,7 +546,7 @@ const App = (function () {
           </ul>
           <p class="ai-consent-fields">Campos: ${campos}</p>
           <p class="ai-consent-note">El consentimiento vale para esta sesión. Puedes revocarlo
-             desde la cinta (Revisar APA → Quitar consentimiento IA).</p>
+             desde la cinta (Revisar APA â†’ Quitar consentimiento IA).</p>
           <div class="ai-consent-actions">
             <button type="button" data-act="no">Cancelar</button>
             <button type="button" class="primary" data-act="si">Autorizar y revisar</button>
@@ -429,9 +624,11 @@ const App = (function () {
         return;
       }
       aiFindings = payload.findings || [];
-      if (!lastFindings.length) runAnalysisQuiet();
+      if (!lastFindings.length) await runAnalysisQuiet();
       renderReport({ summary: lastSummary, findings: lastFindings.concat(aiFindings) });
       openReportes();
+      // el resultado con IA tambien queda guardado hasta la proxima verificacion
+      persistReport();
       (payload.notes || []).forEach((n) => showToast(n, "info"));
       statusMsg.textContent = "";
       showToast(
@@ -587,9 +784,9 @@ const App = (function () {
       renderReport(report);
       // el recuadro del informe aparece junto al documento
       openPane();
-      Library.syncAnalysis(report.summary, currentFile && currentFile.name).catch(() => {
-        /* sin biblioteca no se rompe nada */
-      });
+      // se guarda el informe en la sesion: al reiniciar se vuelve a mostrar
+      // este mismo resultado y no hay que volver a verificar
+      persistReport();
       statusMsg.textContent = "";
       const total = (report.summary && report.summary.total_findings) || (report.findings || []).length;
       showToast("Informe generado: " + total + " hallazgos.", "ok");
@@ -806,6 +1003,48 @@ const App = (function () {
     });
   }
 
+  // Copia serializable del informe: viaja en la sesion y en la biblioteca para
+  // que al reiniciar se pueda mostrar de nuevo sin volver a verificar.
+  function reportSnapshot() {
+    return {
+      summary: lastSummary,
+      findings: allFindings.slice(),
+      resolved: Array.from(resolvedIdx),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // Guarda el informe vigente en la sesion y en la biblioteca. Se llama al
+  // verificar, al revisar con IA y al corregir avisos: el estado queda
+  // disponible tras reiniciar sin volver a gastar la verificacion.
+  function persistReport() {
+    if (!currentFile) return;
+    saveSession(true);
+    Library.syncAnalysis(lastSummary, currentFile.name, reportSnapshot()).catch(() => {
+      /* sin biblioteca no se rompe nada */
+    });
+  }
+
+  // Vuelve a poner en pantalla un informe ya generado. `quiet` evita los avisos
+  // de "texto marcado" al restaurar (no es una accion del usuario).
+  function restoreReportState(data, quiet) {
+    if (!data) return false;
+    const summary = data.summary || null;
+    const findings = Array.isArray(data.findings) ? data.findings : [];
+    if (!summary && !findings.length) return false;
+    lastSummary = summary;
+    allFindings = findings;
+    lastFindings = allFindings;
+    resolvedIdx.clear();
+    (Array.isArray(data.resolved) ? data.resolved : []).forEach((i) => resolvedIdx.add(i));
+    refreshCurrentFindings();
+    markInDocument(quiet);
+    updateCounts();
+    if (reportPane && !reportPane.hidden) renderPane();
+    notifyChange();
+    return true;
+  }
+
   function renderReport(report) {
     const s = report.summary || {};
     lastSummary = s;
@@ -826,7 +1065,7 @@ const App = (function () {
   /* ---------- Senalar los problemas dentro del texto ---------- */
   let marksVisible = true;
 
-  function markInDocument() {
+  function markInDocument(quiet) {
     if (!marksVisible) return;
     if (page.hidden || !currentFindings.length) {
       Marker.clear();
@@ -834,14 +1073,16 @@ const App = (function () {
     }
     const res = Marker.apply(currentFindings);
     if (res.marks || res.blocks) {
-      showToast(
-        (res.marks ? res.marks + " texto(s) marcados" : "") +
-          (res.blocks ? " y " + res.blocks + " párrafo(s)" : "") +
-          " en el documento",
-        "info"
-      );
+      if (!quiet) {
+        showToast(
+          (res.marks ? res.marks + " texto(s) marcados" : "") +
+            (res.blocks ? " y " + res.blocks + " párrafo(s)" : "") +
+            " en el documento",
+          "info"
+        );
+      }
     }
-    if (res.unmatched) {
+    if (res.unmatched && !quiet) {
       showToast(
         res.unmatched + " aviso(s) no se pudieron ubicar en el texto",
         "info"
@@ -1133,7 +1374,15 @@ const App = (function () {
   });
 
   function updateCounts() {
-    const text = (Pager.textOf(page) || "").trim();
+    // Los parrafos vacios del .docx llevan un espacio duro para conservar su
+    // altura (ver keepEmptyParagraphs): se descartan al contar para que las
+    // estadisticas no sumen un caracter por cada linea en blanco.
+    const text = (Pager.textOf(page) || "")
+      .split("\n")
+      .map((line) => line.replace(/\u00a0/g, " ").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim();
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
     statusWords.textContent = words.toLocaleString("es") + " palabras";
     statusChars.textContent = text.length.toLocaleString("es") + " caracteres";
@@ -1158,8 +1407,50 @@ const App = (function () {
   /* ---------- Pagina visible ---------- */
   let totalPages = 0;
   let currentPage = 1;
+
+  // Orientacion de una hoja: el paginador deja el atributo en cada .sheet.
+  function orientacionHoja(n) {
+    const s = page.querySelectorAll(".sheet")[n - 1];
+    if (!s) return "";
+    return s.dataset.orient === "landscape" ? "Horizontal" : "Vertical";
+  }
+
+  // Paginas horizontales y verticales, en rangos ("44-46, 52").
+  function resumenOrientacion() {
+    const sheets = Array.from(page.querySelectorAll(".sheet"));
+    const horiz = [];
+    const vert = [];
+    sheets.forEach((s, i) => {
+      (s.dataset.orient === "landscape" ? horiz : vert).push(i + 1);
+    });
+    const aRangos = (paginas) => {
+      const out = [];
+      let ini = null;
+      let prev = null;
+      for (const n of paginas) {
+        if (ini === null) {
+          ini = n;
+          prev = n;
+          continue;
+        }
+        if (n === prev + 1) {
+          prev = n;
+          continue;
+        }
+        out.push(ini === prev ? String(ini) : ini + "-" + prev);
+        ini = n;
+        prev = n;
+      }
+      if (ini !== null) out.push(ini === prev ? String(ini) : ini + "-" + prev);
+      return out;
+    };
+    return { horiz: aRangos(horiz), vert: aRangos(vert), total: sheets.length };
+  }
+
   function updatePageLabel() {
-    statusPages.textContent = "Página " + currentPage + " de " + Math.max(totalPages, 1);
+    const orient = orientacionHoja(currentPage);
+    statusPages.textContent =
+      "Página " + currentPage + " de " + Math.max(totalPages, 1) + (orient ? " · " + orient : "");
   }
   function trackCurrentPage() {
     const sheets = page.querySelectorAll(".sheet");
@@ -1334,6 +1625,17 @@ const App = (function () {
       // geometria de las secciones: sin esto, al recargar la pagina se
       // perdia que hojas son horizontales y todas se pintaban verticales
       sections: docSections,
+      // fuente y tamano por defecto del documento: si no se guardan, al
+      // restaurar la sesion el #page se queda con la fuente del CSS (Arial)
+      // en vez de la real del .docx (ej: Times New Roman 12)
+      docFont: page.style.fontFamily || "",
+      docSize: page.style.fontSize || "",
+      // version del conversor que produjo `flow`: permite saber si la sesion
+      // guardada se puede reutilizar o hay que reconvertir el .docx
+      flowVersion: FLOW_VERSION,
+      // ultimo informe: se conserva para poder leerlo al reiniciar sin gastar
+      // otra verificacion (ni tokens de IA). Se reemplaza al verificar de nuevo.
+      report: reportSnapshot(),
       savedAt: new Date().toISOString(),
     };
     try {
@@ -1466,7 +1768,13 @@ const App = (function () {
       docName.textContent = doc.name;
       analyzeBtn.disabled = false;
       saveBtn.disabled = false;
-      page.innerHTML = doc.flow;
+      // Si la sesion viene de un conversor anterior se rehace el flujo aqui:
+      // si no, se seguiria viendo el documento tal como estaba antes del arreglo.
+      page.innerHTML = await flowForSession(doc);
+      // La seccion de cada bloque es geometria calculada: si una sesion
+      // anterior la guardo mal, el error se arrastraba en cada recarga. Se
+      // borra para que el paginador la vuelva a deducir del texto.
+      page.querySelectorAll("[data-section]").forEach((el) => el.removeAttribute("data-section"));
       // Las sesiones guardadas antes de este arreglo ya traerian el indice
       // generado dentro del flujo (a veces partido en varios bloques). Se quitan
       // TODOS antes de reconstruirlo, o el indice se veria repetido.
@@ -1481,12 +1789,39 @@ const App = (function () {
       if (!docSections && currentFile) {
         docSections = await fetchSections(currentFile);
       }
+      // Restaurar la fuente y tamano del documento: si no se hace, al
+      // recargar la pagina el #page se queda con la fuente del CSS (Arial)
+      // en vez de la real del .docx (ej: Times New Roman 12). Solo se pisa si
+      // la sesion los trae: si el flujo se acaba de reconvertir, enrichHtml()
+      // ya dejo puesta la fuente correcta y no hay que borrarla.
+      if (doc.docFont) page.style.fontFamily = doc.docFont;
+      if (doc.docSize) page.style.fontSize = doc.docSize;
+      // Si la sesion no trae fuente y hay un .docx original, se la pide al
+      // backend para no perderla (sesiones guardadas antes de este arreglo).
+      if ((!doc.docFont || !doc.docSize) && currentFile) {
+        try {
+          const data = new FormData();
+          data.append("file", currentFile, currentFile.name);
+          const res = await fetch("/api/docx-meta", { method: "POST", body: data });
+          if (res.ok) {
+            const meta = await res.json();
+            const defs = meta.defaults || {};
+            if (defs.font && !doc.docFont) page.style.fontFamily = quoteFont(defs.font);
+            if (defs.size_pt && !doc.docSize) page.style.fontSize = defs.size_pt + "pt";
+          }
+        } catch (e) {
+          /* sin metadatos: se usa la fuente del CSS */
+        }
+      }
       Pager.paginate(page, docSections);
       updateTocPages();
       page.contentEditable = "true";
       emptyState.hidden = true;
       page.hidden = false;
       resetReport();
+      // El informe de la ultima verificacion se conserva hasta que se vuelva a
+      // verificar: asi se puede leer al reiniciar sin gastar otra verificacion.
+      restoreReportState(doc.report, true);
       updateCounts();
       markDirty(false);
       lastSavedAt = doc.savedAt || "";
@@ -1497,7 +1832,28 @@ const App = (function () {
         hour: "2-digit",
         minute: "2-digit",
       });
-      showToast("Sesión restaurada: " + doc.name + " (" + when + ").", "info");
+      if (flowRegenerated) {
+        // Se rehizo el flujo desde el .docx: se avisa para que no sorprenda que
+        // el documento no tenga las ediciones hechas en el visor antes del cambio.
+        flowRegenerated = false;
+        showToast(
+          "Documento reconvertido con el visor actualizado (" + doc.name + "). " +
+            "Las ediciones hechas solo en pantalla no se conservan.",
+          "info"
+        );
+      } else if (flowStale) {
+        // Sin el .docx original no hay de donde rehacer la conversion: se dice
+        // que hay que volver a abrirlo, o la portada seguira viendose igual.
+        flowStale = false;
+        showToast(
+          "Este documento se guardó con una versión anterior del visor y no se " +
+            "puede rehacer sin el .docx original. Vuelve a abrir el archivo para " +
+            "ver la portada corregida.",
+          "info"
+        );
+      } else {
+        showToast("Sesión restaurada: " + doc.name + " (" + when + ").", "info");
+      }
     } catch (e) {
       /* si el guardado esta corrupto, se ignora y se empieza limpio */
     }
@@ -1530,6 +1886,61 @@ const App = (function () {
   ribbonCollapse.addEventListener("click", () =>
     setRibbonCollapsed(!ribbonNav.classList.contains("is-collapsed"))
   );
+
+  /* ---------- Orientacion de las paginas ---------- */
+  const orientModal = document.getElementById("orient-modal");
+  const orientBody = document.getElementById("orient-body");
+  const orientSub = document.getElementById("orient-modal-sub");
+  const orientCount = document.getElementById("orient-count");
+
+  function closeOrientModal() {
+    if (orientModal) orientModal.hidden = true;
+  }
+
+  function openOrientModal() {
+    if (!orientModal) return;
+    const r = resumenOrientacion();
+    if (!r.total) {
+      showToast("Abre un documento primero", "error");
+      return;
+    }
+    orientSub.textContent =
+      "El documento tiene " + r.total + " páginas. Estas son las horizontales y las verticales.";
+    const bloque = (titulo, color, paginas, total) => `
+      <div class="orient-block">
+        <div class="orient-head">
+          <span class="orient-dot ${color}"></span>
+          <b>${titulo}</b>
+          <span class="orient-count">${total} de ${r.total} páginas</span>
+        </div>
+        <p class="orient-pages">${paginas.length ? paginas.join(", ") : "â€”"}</p>
+      </div>`;
+    orientBody.innerHTML =
+      bloque("Páginas horizontales (landscape)", "h", r.horiz, r.horiz.length ? cuenta(r.horiz) : 0) +
+      bloque("Páginas verticales (portrait)", "v", r.vert, r.vert.length ? cuenta(r.vert) : 0);
+    orientCount.textContent = "";
+    orientModal.hidden = false;
+  }
+
+  // numero de paginas de un listado de rangos ("44-46, 52" -> 5)
+  function cuenta(rangos) {
+    let n = 0;
+    for (const rg of rangos) {
+      const partes = rg.split("-");
+      n += partes.length === 2 ? Number(partes[1]) - Number(partes[0]) + 1 : 1;
+    }
+    return n;
+  }
+
+  if (orientModal) {
+    orientModal.addEventListener("click", (e) => {
+      if (e.target === orientModal) closeOrientModal();
+    });
+    const oc = document.getElementById("orient-modal-close");
+    const oCancel = document.getElementById("orient-cancel");
+    if (oc) oc.addEventListener("click", closeOrientModal);
+    if (oCancel) oCancel.addEventListener("click", closeOrientModal);
+  }
 
   /* ---------- Corregir documento ---------- */
   const fixModal = document.getElementById("fix-modal");
@@ -1656,6 +2067,8 @@ const App = (function () {
     }
     const quedan = allFindings.length - resolvedIdx.size;
     renderReport({ summary: lastSummary, partial: true });
+    // los avisos resueltos tambien se guardan: al reiniciar siguen corregidos
+    persistReport();
     if (quedan) {
       setTimeout(function () {
         showToast("Quedan " + quedan + " aviso(s) por revisar manualmente.", "info");
@@ -1674,6 +2087,7 @@ const App = (function () {
     // al deshacer vuelven a aparecer los avisos corregidos
     resolvedIdx.clear();
     renderReport({ summary: lastSummary, partial: true });
+    persistReport();
   }
 
   fixApply.addEventListener("click", applyFixes);
@@ -1685,6 +2099,7 @@ const App = (function () {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !fixModal.hidden) closeFixModal();
+    if (e.key === "Escape" && orientModal && !orientModal.hidden) closeOrientModal();
   });
 
   // el marcado del documento usa estos enlaces con la app
@@ -1745,6 +2160,10 @@ const App = (function () {
   } catch (e) {
     /* sin persistencia */
   }
+
+  // La barra de acciones rápida solo se muestra cuando estamos en "Editar documento".
+  updateQuickActions();
+  document.addEventListener("routechange", () => updateQuickActions());
 
   return api;
 })();

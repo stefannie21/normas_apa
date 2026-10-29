@@ -108,6 +108,11 @@ class FontSizeRule(Rule):
         for p in document.body_paragraphs:
             if p.heading_level or p.in_table:
                 continue
+            # Excepcion de portada/carátula: los tamaños 14/16/18 pt (o
+            # superiores) se usan para la diagramacion institucional y no se
+            # evaluan contra el rango APA del cuerpo (11/12 pt).
+            if getattr(p, "estimated_page", 1) == 1:
+                continue
             # se ignoran super/subindices y marcas de referencia: no son cuerpo de texto
             sizes = {
                 round(r.font_size_pt, 1)

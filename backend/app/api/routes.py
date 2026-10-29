@@ -6,16 +6,22 @@ import unicodedata
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Length
+from docx.text.paragraph import Paragraph
 from lxml import etree
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend.app.config import get_settings
 from backend.app.rules.registry import get_rules
-from backend.app.services import ai_reviewer, report
+from backend.app.services import ai_filter, ai_reviewer, pdf_service, report
 from backend.app.services.analyzer import analyze
-from backend.app.services.docx_parser import image_sizes, parse_docx
+from backend.app.services.docx_parser import (
+    empty_paragraph_marks,
+    image_sizes,
+    parse_docx,
+)
 from backend.app.services.docx_writer import apply_corrections
 from backend.app.services.report_docx import build_report_docx
 
@@ -158,6 +164,21 @@ def _ends_with_page_break(paragraph) -> bool:
     return False
 
 
+def _iter_paragraphs(doc):
+    """Parrafos del cuerpo en orden de documento, incluidos los de las tablas.
+
+    doc.paragraphs se salta las celdas: sin esto, el texto de una tabla (por
+    ejemplo la matriz de consistencia, escrita a 8 pt) se pintaba con el tamano
+    del documento, las filas crecian y la tabla desbordaba la hoja.
+    """
+    for child in doc.element.body.iterchildren():
+        if child.tag == W_NS + "p":
+            yield Paragraph(child, doc)
+        elif child.tag == W_NS + "tbl":
+            for p in child.iter(W_NS + "p"):
+                yield Paragraph(p, doc)
+
+
 def _paragraph_metrics(p) -> dict:
     """Interlineado, separaciones y tamano de fuente resueltos del parrafo."""
     pf = p.paragraph_format
@@ -195,11 +216,24 @@ def _paragraph_metrics(p) -> dict:
         if s is not None and r.text.strip():
             sizes.append(round(s.pt, 1))
 
+    # Espaciado "automatico" de Word: cuando esta puesto, Word ignora el valor
+    # numerico de before/after y usa el suyo (14 pt para el texto de 12 pt del
+    # cuerpo). Si no se traslada, el parrafo queda 9 pt mas pegado al de arriba.
+    auto_before = auto_after = False
+    pPr = p._p.pPr
+    if pPr is not None:
+        sp = pPr.find(qn("w:spacing"))
+        if sp is not None:
+            auto_before = sp.get(qn("w:beforeAutospacing")) == "1"
+            auto_after = sp.get(qn("w:afterAutospacing")) == "1"
+
     return {
         "ls": round(float(ls), 2) if isinstance(ls, (int, float)) else None,
         "sb": pt(pf.space_before, spf.space_before),
         "sa": pt(pf.space_after, spf.space_after),
         "size": max(sizes) if sizes else None,
+        "ab": auto_before,
+        "aa": auto_after,
     }
 
 
@@ -359,7 +393,7 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
         doc = Document(io.BytesIO(data))
         paragraphs = []
         break_next = False
-        for p in doc.paragraphs:
+        for p in _iter_paragraphs(doc):
             key = _text_key(p.text)
             starts_new_page = _breaks_before(p) or break_next
             break_next = _ends_with_page_break(p)
@@ -378,6 +412,9 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
             "defaults": _doc_defaults(doc),
             # tamano declarado de cada figura, en orden de documento
             "images": image_sizes(data),
+            # alto real de cada parrafo vacio: lo marca su tamano de letra,
+            # no el del texto que no tiene
+            "empty_marks": empty_paragraph_marks(data),
         }
     except HTTPException:
         raise
@@ -386,6 +423,26 @@ def docx_meta(file: UploadFile = File(...)) -> JSONResponse:
             status_code=422, detail=f"No se pudo leer el documento: {exc}"
         ) from exc
     return JSONResponse(payload)
+
+
+@router.post("/docx-pdf")
+def docx_pdf_endpoint(file: UploadFile = File(...)) -> Response:
+    """Convierte el .docx a PDF con Word para una vista fiel (sin desformar)."""
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos .docx")
+    data = _read_upload(file, get_settings())
+    try:
+        pdf_bytes = pdf_service.convert_docx_to_pdf(data)
+    except pdf_service.PdfConversionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline; filename=documento.pdf",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("/analyze")
@@ -479,6 +536,10 @@ def ai_classify_endpoint(
     findings, notes, used_model = ai_reviewer.classify_references(
         document, settings, rule_findings=rule_findings
     )
+    # Filtro IA de falsos positivos + sugerencias de correccion (opt-in).
+    filter_result = ai_filter.filter_findings(document, rule_findings)
+    dismissed = [f.to_dict() for f in filter_result.dismissed]
+    all_notes = list(notes) + list(filter_result.notes)
     return JSONResponse(
         {
             "ai_enabled": settings.ai_available,
@@ -486,7 +547,9 @@ def ai_classify_endpoint(
             "model": used_model or settings.resolved_model,
             "cascade": settings.model_cascade,
             "findings": [f.to_dict() for f in findings],
-            "notes": notes,
+            "dismissed": dismissed,
+            "dismissed_count": len(dismissed),
+            "notes": all_notes,
         }
     )
 

@@ -8,6 +8,7 @@ Formas de cita: parentetica, narrativa, cita en bloque.
 """
 from __future__ import annotations
 
+import difflib
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -50,6 +51,184 @@ def first_surname(name: str) -> str:
 INITIAL_TAIL_RE = re.compile(r"(?:^|,\s*|\s)([A-ZÁÉÍÓÚÑ])\.?\s*$")
 
 
+# Particulas y conectores que no identifican a un autor: 'De la Garza' y
+# 'Garza' deben compararse igual, y 'Organisation for Economic...' no debe
+# contar 'for'. Las iniciales de una letra tampoco cuentan como apellido.
+AUTHOR_STOPWORDS = {
+    "de", "del", "la", "las", "los", "el", "y", "e", "and", "for", "para",
+    "da", "das", "do", "dos", "van", "von", "der", "den", "di", "du", "le",
+    "ter", "ten", "the", "of", "en",
+    # conectores con los que suele empezar una cita narrativa
+    "segun", "cuando", "mientras", "aunque", "pero", "ademas", "tambien",
+    "sobre", "entre", "desde", "hasta", "como", "con", "sin", "tras", "ante",
+    "bajo", "contra", "su", "sus", "este", "esta", "estos", "estas",
+    "dicho", "dicha", "dichos", "dichas", "autor", "autora", "autores",
+    "autoras", "teoria", "informe", "estudio", "caso",
+}
+
+
+def author_tokens(text: str) -> list[str]:
+    """Palabras significativas de un bloque de autoria, normalizadas."""
+    norm = strip_accents(text or "").lower()
+    norm = re.sub(r"[^a-z0-9 ]+", " ", norm)
+    return [w for w in norm.split() if len(w) > 1 and w not in AUTHOR_STOPWORDS]
+
+
+def author_heading(raw: str) -> str:
+    """Tramo de autoria de una referencia: lo que va antes del anio."""
+    m = re.match(
+        r"^(.*?)\s*\(\s*(?:[^()]*?(?:1[5-9]\d{2}|20\d{2}|\d{4}|s\.?f\.?|n\.?d\.?)[^()]*?)\s*\)",
+        raw or "",
+    )
+    return (m.group(1) if m else (raw or "")).strip(" .,;")
+
+
+def author_prefix_before_initials(raw: str) -> str:
+    """Extrae el bloque del primer autor antes de sus iniciales o nombres de pila.
+    Ej: 'Estrada Frías, J. (2023)' -> 'Estrada Frías'
+        'Chávez Gamarra, Carlos (2021)' -> 'Chávez Gamarra'
+        'Limaco García (2020)' -> 'Limaco García'
+        'SUNAT. (2021)' -> 'SUNAT'
+        'Municipalidad Metropolitana de Lima. (2022)' -> 'Municipalidad Metropolitana de Lima'
+    """
+    heading = author_heading(raw)
+    if not heading:
+        return ""
+    if "," in heading:
+        return heading.split(",")[0].strip(" .,;")
+    no_initials = re.sub(r"(?:^|,\s*|\s)[A-ZÁÉÍÓÚÑ]\.?\s*$", "", heading)
+    return no_initials.strip(" .,;")
+
+
+def acronym_of(text: str) -> str:
+    """Siglas del nombre: 'Organizacion Mundial de la Salud' -> 'OMS'.
+
+    Las particulas ('de', 'para', 'y') no aportan sigla y en las palabras con
+    guion solo cuenta la primera parte ('Co-operation' -> 'C'), de modo que
+    'Organisation for Economic Co-operation and Development' da 'OECD'.
+    """
+    words = re.findall(r"[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+(?:-[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+)*", text or "")
+    if len(words) == 1:
+        return words[0].upper()
+    out = []
+    for w in words:
+        if w.lower() in AUTHOR_STOPWORDS:
+            continue
+        out.append(w.split("-")[0][0])
+    return "".join(out).upper()
+
+
+def _tokens_match(cit: list[str], ref: list[str]) -> bool:
+    """El bloque citado encaja en el bloque de la referencia."""
+    if not cit or not ref:
+        return False
+    if cit == ref:
+        return True
+    joined = " ".join(ref)
+    text = " ".join(cit)
+    # tramo contiguo en cualquiera de las dos direcciones
+    if re.search(rf"(?<![a-z0-9]){re.escape(text)}(?![a-z0-9])", joined):
+        return True
+    if re.search(rf"(?<![a-z0-9]){re.escape(joined)}(?![a-z0-9])", text):
+        return True
+    # mismos apellidos en otro orden o con uno de mas (en cualquier direccion:
+    # 'Trujillo Valencia' debe encontrar 'Trujillo', y 'Frias' debe encontrar
+    # 'Estrada Frias')
+    if set(cit) <= set(ref) or set(ref) <= set(cit):
+        return True
+    # errata o coincidencia flexible (fuzzy matching)
+    return difflib.SequenceMatcher(None, text, joined).ratio() >= 0.80
+
+
+def author_matches(citation: list[str], reference: "ReferenceRecord") -> bool:
+    """True si la cita corresponde al bloque de autoria de la referencia.
+
+    Aplica estrictamente las reglas globales APA 7:
+    1. Trata los dobles apellidos ('Estrada Frías', 'Chávez Gamarra', 'Limaco García')
+       como un único bloque identificador en las citas del texto.
+    2. Valida la concordancia con la lista de referencias realizando coincidencia flexible
+       (fuzzy matching) antes de las iniciales del autor.
+    3. Prohibido marcar 'cita sin entrada en la lista de referencias' cuando los apellidos
+       del texto coincidan con el inicio de la referencia bibliográfica.
+    4. Reconoce automáticamente como autores válidos a entidades públicas, organizaciones
+       internacionales, municipios y medios de comunicación (ej. 'SUNAT', 'OECD',
+       'Municipalidad Metropolitana de Lima', 'El Comercio').
+    """
+    who = " ".join(s for s in citation if s).strip()
+    if not who:
+        return False
+
+    cit_first = citation[0].strip() if citation else who
+    ref_prefix = author_prefix_before_initials(reference.raw)
+    heading = author_heading(reference.raw)
+
+    c_norm = strip_accents(cit_first).lower()
+    r_norm = strip_accents(ref_prefix).lower()
+    raw_norm = strip_accents(reference.raw).lower()
+
+    # 1. Coincidencia exacta antes de las iniciales
+    if c_norm and r_norm and c_norm == r_norm:
+        return True
+
+    # 2. Coincidencia con el inicio de la referencia (regla obligatoria de APA 7)
+    if c_norm and (raw_norm.startswith(c_norm) or r_norm.startswith(c_norm) or c_norm.startswith(r_norm)):
+        return True
+
+    # 3. Fuzzy matching (coincidencia flexible) antes de las iniciales del autor
+    if c_norm and r_norm and difflib.SequenceMatcher(None, c_norm, r_norm).ratio() >= 0.80:
+        return True
+
+    # 4. Coincidencia por conjunto de tokens del primer autor / bloque completo
+    cit = author_tokens(who)
+    ref = author_tokens(heading)
+    if _tokens_match(cit, ref):
+        return True
+
+    cit_tokens = author_tokens(cit_first)
+    ref_tokens = author_tokens(ref_prefix)
+    if _tokens_match(cit_tokens, ref_tokens):
+        return True
+
+    # 5. Siglas institucionales y autores corporativos
+    compact = re.sub(r"[^A-Za-zÁÉÍÓÚÑÜáéíóúñü]", "", who)
+    if compact.isupper() and 2 <= len(compact) <= 12:
+        if re.search(rf"\b{re.escape(compact)}\b", reference.raw):
+            return True
+
+    acr = acronym_of(who)
+    ref_acr = acronym_of(heading)
+    if len(acr) >= 3 and ref_acr and (
+        acr == ref_acr or sorted(acr) == sorted(ref_acr)
+    ):
+        return True
+
+    # Si es autor corporativo, validar si el nombre aparece en la referencia
+    if is_corporate_author(who) or reference.corporate or is_corporate_author(ref_prefix):
+        if c_norm in raw_norm or r_norm in strip_accents(who).lower():
+            return True
+
+    return False
+
+
+def citation_surname(entry: str) -> str:
+    """Apellido o bloque de apellidos de una cita.
+
+    'Estrada Frias' -> 'Estrada Frias' (apellido compuesto, no solo 'Estrada');
+    'Garcia, J.' -> 'Garcia' (las iniciales no forman parte del apellido).
+    """
+    clean = (entry or "").strip(" .,;")
+    if not clean:
+        return ""
+    if "," in clean:
+        head, tail = clean.split(",", 1)
+        tail = tail.strip()
+        if not tail or not _starts_with_initial(tail):
+            # la cola no son iniciales: apellido compuesto o entidad corporativa
+            return clean
+        return head.strip()
+    return clean
+
+
 def name_initials(name: str) -> list[str]:
     """Iniciales declaradas: 'Sánchez, C. M.' -> ['C','M']."""
     if "," in name:
@@ -64,19 +243,73 @@ def has_initials(name: str) -> bool:
     return bool(INITIAL_TAIL_RE.search((name or "").strip()))
 
 
+CORPORATE_KEYWORDS = (
+    r"(?i)\b("
+    # Entidades publicas / gobierno
+    r"ministerio|ministry|viceministerio|superintendencia|secretar[ií]a|direcci[oó]n|"
+    r"procuradur[ií]a|contralor[ií]a|defensor[ií]a|fiscal[ií]a|congreso|parlamento|parliament|"
+    r"poder\s+judicial|corte|court|tribunal|juzgado|consejo|council|comisi[oó]n|commission|"
+    r"comit[eé]|committee|organismo|autoridad|authority|agencia|agency|bureau|departamento|department|"
+    r"banco\s+central|central\s+bank|polic[ií]a|fuerza\s+a[eé]rea|marina|ej[eé]rcito|guardia|"
+    r"gobierno|government|"
+    # Organizaciones internacionales
+    r"organizaci[oó]n|organization|organisation|naciones\s+unidas|united\s+nations|"
+    r"uni[oó]n\s+europea|european\s+union|banco\s+mundial|world\s+bank|fondo\s+monetario|"
+    r"international\s+monetary\s+fund|comunidad\s+andina|mercosur|aladi|unesco|unicef|cepal|"
+    r"eclac|fao|oms|who|ops|paho|oit|ilo|oea|oas|bid|idb|fmi|imf|omc|wto|otan|nato|"
+    # Municipios y gobiernos subnacionales
+    r"municipalidad|municipio|municipality|alcald[ií]a|comuna|ayuntamiento|intendencia|"
+    r"prefectura|gobierno\s+regional|gobierno\s+local|gobierno\s+aut[oó]nomo|concej[o|al][ií]a|"
+    r"gore\b|"
+    # Medios de comunicacion
+    r"el\s+comercio|la\s+rep[uú]blica|el\s+peruano|diario\s+oficial|diario|peri[oó]dico|newspaper|"
+    r"gesti[oó]n|rpp|andina|agencia\s+andina|canal\s+n|am[eé]rica\s+televisi[oó]n|latina|atv|"
+    r"tv\s+per[uú]|el\s+pa[ií]s|the\s+new\s+york\s+times|the\s+guardian|the\s+washington\s+post|"
+    r"the\s+economist|the\s+wall\s+street\s+journal|financial\s+times|bbc|cnn|reuters|bloomberg|"
+    r"associated\s+press|afp|efe|agencia\s+efe|forbes|national\s+geographic|semanario|noticiero|"
+    r"noticias|news|radio|televisi[oó]n|broadcast|gaceta|bolet[ií]n|editorial|press|publishing|"
+    # Instituciones academicas / sociedades
+    r"universidad|university|instituto|institute|academia|academy|fundaci[oó]n|foundation|"
+    r"asociaci[oó]n|association|sociedad|society|corporaci[oó]n|corporation|colegio|hospital|"
+    r"cl[ií]nica|museo|museum|banco|bank|empresa|company|centro|center|centre|c[aá]mara|chamber|"
+    r"federaci[oó]n|federation|confederaci[oó]n|confederation"
+    r")\b"
+)
+
+KNOWN_CORPORATE_ACRONYMS = {
+    "SUNAT", "OECD", "OCDE", "INEI", "BCRP", "BCR", "SBS", "MINSA", "MINEDU", "MEF",
+    "MIDIS", "MTC", "MINAM", "MINCETUR", "INDECOPI", "CONCYTEC", "OSIPTEL", "OSINERGMIN",
+    "SUNASS", "RENIEC", "ONPE", "JNE", "OMS", "WHO", "OPS", "PAHO", "BID", "IDB", "CEPAL",
+    "ECLAC", "UNESCO", "UNICEF", "FAO", "OIT", "ILO", "FMI", "IMF", "BM", "ONU", "UN",
+    "OEA", "OAS", "OMC", "WTO", "OTAN", "NATO", "UE", "EU", "PNUD", "USAID", "DAAD",
+    "MML", "CAN", "MERCOSUR", "GORE"
+}
+
+
 def is_corporate_author(name: str) -> bool:
-    """Un autor corporativo no tiene iniciales y suele acabar en inc tipo de entidad."""
-    clean = name.strip()
+    """Reconoce automáticamente a entidades públicas, organizaciones internacionales,
+    municipios y medios de comunicación como autores corporativos/institucionales válidos.
+    """
+    clean = (name or "").strip()
     if not clean:
         return False
-    if has_initials(clean):
+    if has_initials(clean) and "," in clean:
         return False
-    corporate_tail = (
-        r"(?i)\b(universidad|organizaci[oó]n|instituto|ministerio|agencia|comisi[oó]n|"
-        r"asociaci[oó]n|empresa|sociedad|consejo|fundaci[oó]n|centro|colegio|gobierno|"
-        r"hospital|museo|banco|corporaci[oó]n)\b"
-    )
-    return bool(re.search(corporate_tail, strip_accents(clean)))
+
+    clean_no_punct = re.sub(r"[^\w\s]", " ", clean)
+    tokens = clean_no_punct.split()
+    for t in tokens:
+        t_upper = t.upper()
+        if t_upper in KNOWN_CORPORATE_ACRONYMS:
+            return True
+        if t.isupper() and 2 <= len(t) <= 8 and not t.isdigit():
+            return True
+
+    norm = strip_accents(clean)
+    if re.search(CORPORATE_KEYWORDS, norm):
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------- registros
@@ -156,39 +389,48 @@ class Bibliography:
 
     def uncited_references(self) -> list[ReferenceRecord]:
         """Referencias que nunca aparecen citadas en el cuerpo."""
-        keys = {c.key for c in self.citations if c.key[0]}
         seen: set[tuple] = set()
         out = []
         for r in self.references:
             if not r.surnames or not r.surnames[0]:
                 continue
-            if r.key in keys or r.key in seen:
+            if r.key in seen:
                 continue
             seen.add(r.key)
-            # coincidencia laxa: mismo primer apellido y mismo ano
-            if any(
-                c.year == r.year and c.surnames and c.surnames[0] == r.surnames[0]
+            cited = any(
+                (c.year == r.year or r.year is None) and author_matches(c.surnames, r)
                 for c in self.citations
-            ):
-                continue
-            out.append(r)
+            )
+            if not cited:
+                out.append(r)
         return out
 
     def missing_references(self) -> list[CitationRecord]:
         """Citas del cuerpo que no tienen entrada en la lista de referencias.
 
-        Se devuelve una entrada por autor+ano distintos: si un autor se cita cien
-        veces, el problema es uno solo y no debe generar cien hallazgos.
+        La comparacion es por bloque de apellidos (no por el primer token), de
+        modo que 'Estrada Frias', 'Taminchi Pilco' o 'De la Garza' encuentran su
+        entrada aunque la cita venga recortada a 'Frias' o 'Garza'. Se devuelve
+        una entrada por autor+ano distintos: si un autor se cita cien veces, el
+        problema es uno solo y no debe generar cien hallazgos.
         """
-        keys = {r.key for r in self.references if r.key[0]}
         unique: list[CitationRecord] = []
         for c in self.citations:
-            if not c.key[0] or c.key in keys:
+            if not c.surnames:
                 continue
-            # coincidencia laxa por apellido + ano
-            if any(r.year == c.year and r.surnames and r.surnames[0] == c.surnames[0] for r in self.references):
+            if any(
+                author_matches(c.surnames, r)
+                for r in self.references
+            ):
                 continue
-            if any(u.key == c.key for u in unique):
+            # la misma cita puede detectarse dos veces (narrativa y parentetica)
+            if any(
+                u.year == c.year
+                and u.surnames
+                and u.surnames[0].lower() == c.surnames[0].lower()
+                and "_".join(u.surnames).lower() == "_".join(c.surnames).lower()
+                for u in unique
+            ):
                 continue
             unique.append(c)
         return unique
@@ -200,12 +442,29 @@ YEAR_RE = re.compile(r"(1[5-9]\d{2}|20\d{2})")
 LOCATOR_RE = re.compile(r"\b(p{1,2}\.\s*\d+[\-–]?\d*|p[aá]rr?\.\s*\d+)", re.IGNORECASE)
 ET_AL_RE = re.compile(r"\bet\s?al\.?", re.IGNORECASE)
 PAREN_RE = re.compile(r"\(([^()]{2,120})\)")
-# "García (2020)" o "Según García y López (2020)"
-NARRATIVE_RE = re.compile(
-    r"([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'\-]+(?:\s*(?:,|&|y|and)\s*[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'\-]+)*)"
-    r"\s*(?:\([^)]*?)?\s*\((1[5-9]\d{2}|20\d{2}|s\.?f\.?)\)"
+# "García (2020)", "Según García y López (2020)" o "Estrada Frías (2023)".
+# Se admiten hasta cuatro palabras capitalizadas seguidas para no cortar los
+# apellidos compuestos ni el nombre de una entidad.
+AUTHOR_ITEM_PAT = (
+    r"(?:(?:de\s+|del\s+|la\s+|las\s+|los\s+|van\s+|von\s+)?[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'\-]+"
+    r"(?:\s+(?:de\s+|del\s+|la\s+|las\s+|los\s+)?[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ'\-]+){0,3})"
 )
-AUTHOR_SPLIT_RE = re.compile(r"\s*(?:&|\band\b\s+|\by\b\s+|;)\s*")
+NARRATIVE_RE = re.compile(
+    rf"({AUTHOR_ITEM_PAT}"
+    rf"(?:\s*(?:,|&|\by\b|\be\b|\band\b)\s*{AUTHOR_ITEM_PAT})*"
+    rf"(?:\s+et\s+al\.?)?)"
+    r"\s*(?:\([^)]*?\))?\s*\((1[5-9]\d{2}|20\d{2}|\d{4}|s\.?f\.?|n\.?d\.?)\)",
+    re.IGNORECASE,
+)
+# Conectores y verbos que se descartan del inicio del bloque narrativo
+NARRATIVE_LEAD_RE = re.compile(
+    r"^(?:(?:como|de\s+acuerdo\s+con|en\s+palabras\s+de|en\s+opini[oó]n\s+de|conforme\s+a|a\s+juicio\s+de|seg[uú]n|"
+    r"cuando|mientras|aunque|pero|adem[aá]s|tambi[eé]n|respecto|para|por|desde|hasta|entre|sobre|tras|ante|bajo|contra)\s+)*"
+    r"(?:afirman?|sostienen?|se[nñ]alan?|indican?|plantean?|concluyen?|mencionan?|destacan?|proponen?|demuestran?|"
+    r"afirm[oó]|sostuvo|se[nñ]al[oó]|indic[oó]|plante[oó]|concluy[oó]|mencion[oó]|destac[oó]|propuso|demostr[oó])?\s*",
+    re.IGNORECASE,
+)
+AUTHOR_SPLIT_RE = re.compile(r"\s*(?:&|\band\b\s+|\by\b\s+|\be\b\s+|;)\s*")
 ET_AL_MIDDLE_RE = re.compile(r"\.\.\.|\bet\s+al\b", re.IGNORECASE)
 
 
@@ -219,8 +478,8 @@ def _split_authors(block: str) -> list[str]:
     block = re.sub(r"\.\.\.", ",", block)
     block = ET_AL_MIDDLE_RE.sub(",", block)
 
-    # normaliza 'y'/'&' finales antes de una coma: 'Vega, P., y ' -> coma simple
-    block = re.sub(r"(?:,|\s)*(?:&|\band\b|\by\b)\s*", ",", block)
+    # normaliza 'y'/'e'/'&'/'and' finales antes de una coma: 'Vega, P., y ' -> coma simple
+    block = re.sub(r"(?:,|\s)*(?:&|\band\b|\by\b|\be\b)\s*", ",", block)
 
     tokens = [t.strip(" .,;") for t in block.split(",")]
     authors: list[str] = []
@@ -234,7 +493,9 @@ def _split_authors(block: str) -> list[str]:
             # despues de un apellido pueden venir iniciales sueltas: 'Ramos, L.'
             initials: list[str] = []
             j = i + 1
-            while j < len(tokens) and not _looks_like_surname(tokens[j]):
+            while j < len(tokens) and (
+                not _looks_like_surname(tokens[j]) or _starts_with_initial(tokens[j])
+            ):
                 initials.append(tokens[j])
                 j += 1
             authors.append(token + (", " + ", ".join(initials) if initials else ""))
@@ -268,14 +529,33 @@ def _is_spain_format_pair(first: str, second: str) -> bool:
     return all(len(w) > 2 for w in a)
 
 
+def _starts_with_initial(token: str) -> bool:
+    """'L. A.', 'S. de los A.' o 'A. del J.' empiezan por una inicial."""
+    t = (token or "").strip()
+    if not t:
+        return False
+    # inicial con punto: 'L.', 'S. de los A.'
+    if re.match(r"^[A-ZÁÉÍÓÚÑ]\.", t):
+        return True
+    # inicial suelta sin punto (el parser quita los puntos al tokenizar): 'L', 'S'
+    if re.fullmatch(r"[A-ZÁÉÍÓÚÑ]", t):
+        return True
+    return False
+
+
 def _looks_like_surname(token: str) -> bool:
-    """Un apellido empieza por mayuscula y no es solo una inicial."""
+    """Un apellido empieza por mayuscula o particula espanola/nobiliaria y no es solo una inicial."""
     t = token.strip()
     if not t:
         return False
     if re.fullmatch(r"[A-ZÁÉÍÓÚÑ]\.?", t):
         return False  # es una inicial
-    return bool(re.match(r"[A-ZÁÉÍÓÚÑ]", t))
+    # 'L. A.' o 'J. J.' son las iniciales del autor anterior, no un apellido:
+    # contarlas como autor hacia que 'Clark, L. A., y Watson, D.' pareciera una
+    # obra de tres autores y se exigiera 'et al.' en una cita de dos.
+    if re.fullmatch(r"(?:[A-ZÁÉÍÓÚÑ]\.?\s*)+", t):
+        return False
+    return bool(re.match(r"^(?:(?:de\s+|del\s+|de\s+la\s+|de\s+los\s+|de\s+las\s+|van\s+|von\s+|da\s+|das\s+|di\s+)?[A-ZÁÉÍÓÚÑ])", t, re.IGNORECASE))
 
 
 def _title_and_container(after_date: str) -> tuple[str, str]:
@@ -306,23 +586,22 @@ def parse_reference(paragraph: ParagraphInfo) -> ReferenceRecord:
     italic_texts = [r.text.strip() for r in paragraph.runs if r.italic and r.text.strip()]
     has_italics = bool(italic_texts)
 
-    # El corte correcto es el parentesis DEL ANIO: el autor corporativo puede
-    # llevar la sigla antes, p. ej. 'Universidad Cesar Vallejo (UCV). (2024).
-    # Titulo. Fuente.' Cortar en el primero hacia '(UCV)' y el titulo acababa
-    # siendo '(2024)', que es lo que despues se ponía en cursiva.
-    date_pat = r"(?P<date>[^)]*(?:1[89]\d{2}|20\d{2}|s/?f)[^)]*)"
+    # Patrón flexible de año (AAAA) entre paréntesis en el encabezado
+    date_pat = r"(?P<date>[^)]*?(?:1[89]\d{2}|20\d{2}|\d{4}|s\.?\s*f\.?|n\.?\s*d\.?)[^)]*?)"
     m = re.match(rf"^(?P<authors>.+?)\s*\({date_pat}\)\.?\s*(?P<rest>.*)$", text, re.S)
     if not m:
         # sin anio reconocible se corta como antes, para no perder la referencia
         m = re.match(r"^(?P<authors>.+?)\s*\((?P<date>[^)]*)\)\.?\s*(?P<rest>.*)$", text, re.S)
     if not m:
+        corp_check = is_corporate_author(text) or is_corporate_author(author_heading(text))
         return ReferenceRecord(
             paragraph_index=paragraph.index,
             page=paragraph.estimated_page,
             raw=text,
-            surnames=[],
+            surnames=[author_heading(text)] if corp_check else [],
             year=None,
-            author_count=0,
+            author_count=1 if corp_check else 0,
+            corporate=corp_check,
             title=text,
             has_italics=has_italics,
             italic_texts=italic_texts,
@@ -336,11 +615,15 @@ def parse_reference(paragraph: ParagraphInfo) -> ReferenceRecord:
     year = int(year_match.group(1)) if year_match else None
 
     has_et_al = bool(ET_AL_RE.search(authors_block))
-    authors_raw = _split_authors(authors_block)
-    surnames = [first_surname(a) for a in authors_raw]
-    surnames = [s for s in surnames if s]
+    corporate = is_corporate_author(authors_block) and not (has_initials(authors_block) and "," in authors_block)
 
-    corporate = is_corporate_author(authors_block) and not has_initials(authors_block)
+    if corporate:
+        authors_raw = [authors_block]
+        surnames = [authors_block]
+    else:
+        authors_raw = _split_authors(authors_block)
+        surnames = [citation_surname(a) for a in authors_raw]
+        surnames = [s for s in surnames if s]
 
     title, container = _title_and_container(rest)
     doi_match = re.search(r"(?:doi\.org/|doi:\s*)(10\.\d{4,9}/[^\s]+)", rest, re.IGNORECASE)
@@ -355,7 +638,7 @@ def parse_reference(paragraph: ParagraphInfo) -> ReferenceRecord:
         author_count=len(authors_raw),
         has_et_al=has_et_al,
         corporate=corporate,
-        initials=name_initials(authors_raw[0]) if authors_raw else [],
+        initials=name_initials(authors_raw[0]) if (authors_raw and not corporate) else [],
         title=title,
         container=container,
         source_kind=_source_kind(rest),
@@ -363,7 +646,7 @@ def parse_reference(paragraph: ParagraphInfo) -> ReferenceRecord:
         url=url_match.group(0).rstrip(".") if url_match else "",
         has_italics=has_italics,
         italic_texts=italic_texts,
-        initials_count=sum(1 for a in authors_raw if has_initials(a)),
+        initials_count=sum(1 for a in authors_raw if has_initials(a)) if not corporate else 0,
     )
     rec.type_hint = infer_reference_type(rec, title, container, rest)
     return rec
@@ -416,33 +699,44 @@ def extract_citations(paragraphs: list[ParagraphInfo]) -> list[CitationRecord]:
             if not re.match(r"^[A-ZÁÉÍÓÚÑ(\s]", inner) and not re.match(r"^\(", inner):
                 continue
             loc = LOCATOR_RE.search(inner)
-            surnames = [
-                first_surname(s)
-                for s in _split_authors(re.sub(r"\d.*$", "", inner).strip(" ,;"))
-            ]
-            surnames = [s for s in surnames if s]
-            if not surnames:
-                continue
-            year_match = YEAR_RE.search(inner)
-            out.append(
-                CitationRecord(
-                    paragraph_index=p.index,
-                    page=p.estimated_page,
-                    raw=f"({inner})",
-                    surnames=surnames,
-                    year=int(year_match.group(1)) if year_match else None,
-                    form="bloque" if is_block else "parentetica",
-                    has_et_al=bool(ET_AL_RE.search(inner)),
-                    has_locator=bool(loc),
-                    locator_text=loc.group(1) if loc else "",
-                    word_count=len(text.split()),
-                    block_quote=is_block,
+            # un parentesis puede contener varias citas separadas por ';'
+            segments = [s.strip() for s in re.split(r"\s*;\s*", inner) if s.strip()]
+            if len(segments) <= 1:
+                segments = [inner]
+            for seg in segments:
+                if not (YEAR_RE.search(seg) or re.search(r"\bs\.?f\.?\b", seg, re.I)):
+                    continue
+                surnames = [
+                    citation_surname(s)
+                    for s in _split_authors(re.sub(r"\d.*$", "", seg).strip(" ,;"))
+                ]
+                surnames = [s for s in surnames if s]
+                if not surnames:
+                    continue
+                year_match = YEAR_RE.search(seg)
+                out.append(
+                    CitationRecord(
+                        paragraph_index=p.index,
+                        page=p.estimated_page,
+                        raw=f"({seg})",
+                        surnames=surnames,
+                        year=int(year_match.group(1)) if year_match else None,
+                        form="bloque" if is_block else "parentetica",
+                        has_et_al=bool(ET_AL_RE.search(seg)),
+                        has_locator=bool(loc),
+                        locator_text=loc.group(1) if loc else "",
+                        word_count=len(text.split()),
+                        block_quote=is_block,
+                    )
                 )
-            )
 
-        # narrativas: 'García (2020)'
+        # narrativas: 'García (2020)', 'Estrada Frías y Chávez Gamarra (2023)'
         for match in NARRATIVE_RE.finditer(text):
-            surnames = [first_surname(s) for s in _split_authors(match.group(1))]
+            block = match.group(1).strip()
+            # descarta el conector o verbo con el que empieza la frase ("Según X", "Como afirman X")
+            block = NARRATIVE_LEAD_RE.sub("", block).strip()
+            clean_block = ET_AL_RE.sub("", block).strip()
+            surnames = [citation_surname(s) for s in _split_authors(clean_block)]
             surnames = [s for s in surnames if s]
             if not surnames:
                 continue

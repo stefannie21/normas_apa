@@ -133,6 +133,7 @@ const Ribbon = (function () {
           label: "Mostrar",
           controls: [
             { type: "action", action: "toggle-pane", icon: "panel", label: "Ver informe" },
+            { type: "action", action: "orientacion", icon: "pageBreak", label: "Orientación de páginas" },
             { type: "action", action: "toggle-ruler", icon: "ruler", label: "Regla" },
           ],
         },
@@ -183,7 +184,7 @@ const Ribbon = (function () {
 
   function renderGroups(tab) {
     panelsEl.innerHTML = "";
-    const panel = el("div", "ribbon-panel active");
+    const panel = el("div", "ribbon-panel active" + (tab.id !== "inicio" ? " ribbon-side" : ""));
     tab.groups.forEach((g) => {
       const group = el("div", "ribbon-group");
       const controls = el("div", "ribbon-group-controls");

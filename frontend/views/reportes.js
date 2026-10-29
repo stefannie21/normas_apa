@@ -4,18 +4,19 @@
    completa. Los datos salen del editor (app.report()), que es quien analiza; la
    vista no calcula nada por su cuenta salvo el filtro por gravedad, el filtro
    por categoria, la busqueda y la paginacion.
- */
+*/
 import { Router } from "../core/router.js";
 import { Dom } from "../core/dom.js";
 
 const { esc, icon } = Dom;
 
-// Se usan letras y no iconos: "!" para lo que rompe la norma y "i" para lo
-// que solo conviene mirar.
-const SEV_ICON = { error: "!", warning: "!", info: "i" };
 const SEV_TEXT = { error: "Error", warning: "Aviso", info: "Observación" };
+const SEV_COLOR = { error: "#e53e3e", warning: "#d69e2e", info: "#3182ce" };
+const SEV_ICON = { error: "xCircle", warning: "alert", info: "infoCircle" };
+// la gravedad se muestra como prioridad, igual que en el filtro "Prioridad"
+const SEV_PRIO = { error: "Alta", warning: "Media", info: "Baja" };
 
-const POR_PAGINA = 10;
+const POR_PAGINA = 6;
 
 let root = null;
 let app = null;
@@ -35,41 +36,6 @@ function contar(list) {
   return c;
 }
 
-/* El anillo avanza segun el cumplimiento. El valor viaja como variable CSS
-   para no repintar bordes desde JS. */
-function pintarAnillo(score) {
-  const ring = document.querySelector(".score-ring");
-  if (!ring) return;
-  const pct = score == null ? 0 : Math.max(0, Math.min(100, Number(score) || 0));
-  ring.style.setProperty("--pct", String(pct));
-  const color =
-    score == null
-      ? "var(--accent-soft)"
-      : pct < 50
-        ? "var(--error)"
-        : pct < 75
-          ? "var(--warning)"
-          : "var(--accent)";
-  ring.style.setProperty("--ring-color", color);
-}
-
-function nivel(score) {
-  if (score == null) return { txt: "Sin datos", clase: "none" };
-  if (score >= 75) return { txt: "Alto", clase: "alto" };
-  if (score >= 50) return { txt: "Medio", clase: "medio" };
-  return { txt: "Bajo", clase: "bajo" };
-}
-
-/* Una tarjeta de conteo: icono circular, numero y etiqueta. */
-function tarjeta(clase, icono, valor, texto) {
-  return `<div class="rv-card ${clase}">
-      <span class="rv-card-icn">${icono}</span>
-      <div class="pc-num">${esc(valor)}</div>
-      <div class="pc-label">${esc(texto)}</div>
-    </div>`;
-}
-
-/* Buscar sin tildes: "sangria" debe encontrar "sangria" y "sangria". */
 function sinTildes(texto) {
   return String(texto || "")
     .normalize("NFKD")
@@ -98,7 +64,6 @@ function visibles(lista) {
   );
 }
 
-/* Ventana de paginas: 1 2 3 4 5 ... 160 (con la actual resaltada). */
 function listaPaginas(total, actual) {
   if (total <= 1) return [1];
   const out = [];
@@ -126,51 +91,114 @@ function paginacion(total, actual) {
     .join("");
   return `<div class="rv-pages">
       <button data-pag="${actual - 1}" class="rv-pg-arrow" ${actual <= 1 ? "disabled" : ""}
-        aria-label="Pagina anterior">${icon("chevron")}</button>
+        aria-label="Pagina anterior">&#10094;</button>
       ${botones}
       <button data-pag="${actual + 1}" class="rv-pg-arrow next" ${actual >= total ? "disabled" : ""}
-        aria-label="Pagina siguiente">${icon("chevron")}</button>
+        aria-label="Pagina siguiente">&#10095;</button>
     </div>`;
 }
 
-function hallazgo(f, indice) {
-  const extra = f.extra || {};
-  const esIa = String(f.rule_id || "").startsWith("AI-");
-  const badge = esIa
-    ? `<span class="ai-badge" title="Sugerencia de la IA: no se aplica automaticamente">IA</span>`
+/* Etiqueta de gravedad: circulo relleno con el simbolo en blanco + nombre. */
+function sevChip(sev) {
+  const k = SEV_TEXT[sev] ? sev : "info";
+  return `<span class="rv-sev-chip rv-sev-${k}">
+      <span class="rv-sev-ico">${icon(SEV_ICON[k])}</span>${esc(SEV_TEXT[k])}
+    </span>`;
+}
+
+/* "Párrafo 14" / "Pág. 3": el backend manda una sola cadena
+   ("Párrafo 14", "Página 3 (párrafo 14)", "Sección 2"), aqui se parte en las
+   dos lineas de la columna Ubicacion. */
+function ubicacion(location) {
+  const loc = String(location || "").trim();
+  const pag = loc.match(/P[áa]gina\s*(\d+)/i);
+  const par = loc.match(/p[áa]rrafo\s*(\d+)/i);
+  const sec = loc.match(/secci[óo]n\s*(\d+)/i);
+  const principal = par
+    ? "Párrafo " + par[1]
+    : sec
+      ? "Sección " + sec[1]
+      : loc || "—";
+  return { principal, secundario: pag ? "Pág. " + pag[1] : "" };
+}
+
+function filaHallazgo(f, indice) {
+  const sev = SEV_TEXT[f.severity] ? f.severity : "info";
+  const regla = esc(f.rule_id || "");
+  const categoriaTexto = esc(f.category || "Hallazgo");
+  const mensaje = esc(f.message || "");
+  const excerpt = f.excerpt ? `<div class="rv-excerpt">"${esc(f.excerpt)}"</div>` : "";
+  const sugerencia = f.suggestion
+    ? `<div class="rv-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> <span>${esc(f.suggestion)}</span></div>`
     : "";
-  const conf =
-    esIa && extra.ai_confidence != null
-      ? `<span class="ai-conf">confianza ${Math.round(extra.ai_confidence * 100)}%</span>`
-      : "";
-  const falta =
-    esIa && extra.ai_missing && extra.ai_missing.length
-      ? `<p class="finding-missing">Falta: ${esc(extra.ai_missing.join(" · "))}</p>`
-      : "";
-  const pag = String(f.location || "").match(/[Pp][áa]g\.?\s*([\d]+)/);
-  const chip = pag ? `Pág. ${esc(pag[1])}` : esc(f.location || "");
-  return `<article class="finding ${esc(f.severity)}${esIa ? " ai" : ""}" data-i="${indice}">
-      <div class="finding-rail">
-        <span class="dot">${SEV_ICON[f.severity] || ""}</span>
-        <span class="finding-sev">${SEV_TEXT[f.severity] || ""}</span>
-      </div>
-      <div class="finding-body">
-        <div class="finding-head">
-          <span class="finding-cat">${esc(f.category || "")}</span>
-          ${badge}${conf}
-          <span class="finding-rule">${esc(f.rule_id || "")}</span>
+  const ubic = ubicacion(f.location);
+
+  return `<tr class="rv-row rv-${sev}" data-i="${indice}">
+      <td class="rv-tipo">
+        ${sevChip(sev)}
+      </td>
+      <td class="rv-desc">
+        <div class="rv-desc-titulo">${categoriaTexto}</div>
+        <div class="rv-desc-texto">${mensaje}</div>
+        ${regla ? `<div class="rv-regla">${icon("tag")} Regla ${regla}</div>` : ""}
+        ${excerpt}
+        ${sugerencia}
+      </td>
+      <td class="rv-ubi">
+        <div class="rv-ubi-texto">${esc(ubic.principal)}</div>
+        ${ubic.secundario ? `<div class="rv-ubi-sec">${esc(ubic.secundario)}</div>` : ""}
+      </td>
+      <td class="rv-prio">
+        <span class="rv-prio-chip rv-prio-${sev}">${SEV_PRIO[sev]}</span>
+      </td>
+      <td class="rv-acc">
+        <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver en el documento">${icon("eye")}</button>
+        <button class="rv-iconbtn rv-more" data-act="mas" data-i="${indice}" title="Mas opciones">${icon("moreV")}</button>
+        <div class="rv-more-pop" id="rv-pop-${indice}" hidden>
+          <button class="rv-pop-item" data-act="corregir" data-i="${indice}">${icon("fix")} Corregir</button>
+          <button class="rv-pop-item" data-act="descartar" data-i="${indice}">${icon("xCircle")} Descartar</button>
         </div>
-        <p class="finding-msg">${esc(f.message || "")}</p>
-        ${falta}
-        ${f.excerpt ? `<p class="finding-excerpt">"${esc(f.excerpt)}"</p>` : ""}
-        ${
-          f.suggestion
-            ? `<p class="finding-sug"><span class="icn">${icon("bulb")}</span><b>Sugerencia:</b> ${esc(f.suggestion)}</p>`
-            : ""
-        }
-      </div>
-      <div class="finding-side">${chip ? `<span class="finding-page">${chip}</span>` : ""}</div>
-    </article>`;
+      </td>
+    </tr>`;
+}
+
+/* El anillo avanza segun el cumplimiento. El valor viaja como variable CSS
+   para no repintar bordes desde JS. */
+function pintarAnillo(score) {
+  const ring = document.querySelector(".score-ring");
+  if (!ring) return;
+  const pct = score == null ? 0 : Math.max(0, Math.min(100, Number(score) || 0));
+  ring.style.setProperty("--pct", String(pct));
+  const color =
+    score == null
+      ? "var(--accent-soft)"
+      : pct < 50
+        ? "var(--error)"
+        : pct < 75
+          ? "var(--warning)"
+          : "var(--accent)";
+  ring.style.setProperty("--ring-color", color);
+}
+
+/* Tarjetas del informe: misma pieza que las de Inicio (.stat), para que el
+   panel y el informe no se vean como dos aplicaciones distintas. La barra de
+   progreso solo la lleva la tarjeta de cumplimiento. */
+function tarjeta(tone, icono, valor, texto, enlaceTexto, enlaceAct, barra) {
+  const enlace = enlaceTexto
+    ? `<button class="stat-link" data-act="${enlaceAct}">${esc(enlaceTexto)}</button>`
+    : "";
+  const pct = barra == null ? null : Math.max(0, Math.min(100, Number(barra) || 0));
+  const bar =
+    pct == null
+      ? ""
+      : `<div class="stat-bar"><div class="stat-bar-fill" style="width:${pct}%"></div></div>`;
+  return `<div class="stat ${tone}${valor === "—" ? " vacio" : ""}">
+      <span class="stat-icn">${icono}</span>
+      <span class="stat-num">${esc(valor)}</span>
+      <span class="stat-label">${esc(texto)}</span>
+      ${bar}
+      ${enlace}
+    </div>`;
 }
 
 function render() {
@@ -181,7 +209,6 @@ function render() {
     st.summary && st.summary.compliance_score != null
       ? st.summary.compliance_score
       : null;
-  const nivelTxt = nivel(score);
 
   const filtrada = visibles(lista);
   const totalPaginas = Math.max(1, Math.ceil(filtrada.length / POR_PAGINA));
@@ -190,41 +217,32 @@ function render() {
   const desde = (pagina - 1) * POR_PAGINA;
   const enPagina = filtrada.slice(desde, desde + POR_PAGINA);
 
-  const filtros = [
-    ["all", "Todos"],
-    ["error", "Errores"],
-    ["warning", "Avisos"],
-    ["info", "Observ."],
+  // Chips de filtro: el activo va relleno con su color y el resto con el tinte
+  const chips = [
+    ["all", "Todos", cuentas.all || 0, "var(--accent)", "var(--accent-soft)"],
+    ["error", "Errores", cuentas.error || 0, "var(--error)", "#fbe9e7"],
+    ["warning", "Avisos", cuentas.warning || 0, "var(--warning)", "#fdf3e0"],
+    ["info", "Observaciones", cuentas.info || 0, "var(--info)", "#e8f1f8"],
   ]
     .map(
-      ([k, texto]) =>
-        `<button data-filter="${k}" class="${filtro === k ? "active" : ""}">${texto} <b>${cuentas[k] || 0}</b></button>`
+      ([k, texto, n, col, fondo]) =>
+        `<button data-filter="${k}" class="rv-chip ${filtro === k ? "active" : ""}"
+          style="--c:${col};--bg:${fondo}">${texto} <b>${n}</b></button>`
     )
     .join("");
 
-  // chips de categoria (se despliegan con el boton Filtros)
-  const cats = contarCategorias(lista);
-  const catChips = cats.length
-    ? `<div class="rv-cats">
-        <button data-cat="" class="${categoria ? "" : "active"}">Todas <b>${lista.length}</b></button>
-        ${cats
-          .map(
-            ([c, n]) =>
-              `<button data-cat="${esc(c)}" class="${categoria === c ? "active" : ""}">${esc(c)} <b>${n}</b></button>`
-          )
-          .join("")}
-      </div>`
-    : "";
-
   const cuerpo = !st.ready
-    ? `<p class="empty-pane">Aún no se ha verificado el documento.</p>`
+    ? `<tr><td colspan="5" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
     : enPagina.length
-      ? enPagina.map((f) => hallazgo(f, lista.indexOf(f))).join("")
-      : `<p class="empty-pane">Sin hallazgos con estos filtros.</p>`;
+      ? enPagina.map((f) => filaHallazgo(f, lista.indexOf(f))).join("")
+      : `<tr><td colspan="5" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
+
+  const inicioRango = filtrada.length ? desde + 1 : 0;
+  const finRango = Math.min(desde + POR_PAGINA, filtrada.length);
 
   const pie = st.ready
     ? `<div class="rv-foot">
-        <span class="rv-count">Mostrando ${filtrada.length ? desde + 1 : 0} de ${filtrada.length} hallazgos${
+        <span class="rv-count">Mostrando ${inicioRango} - ${finRango} de ${filtrada.length} hallazgos${
           filtrada.length !== lista.length ? ` (de ${lista.length})` : ""
         }</span>
         ${paginacion(totalPaginas, pagina)}
@@ -237,66 +255,104 @@ function render() {
         <span class="rv-head-icn">${icon("chart")}</span>
         <div>
           <h1>Reportes</h1>
-          <p>Resumen del cumplimiento y el detalle de los hallazgos del documento.</p>
+          <p>Revise los hallazgos, el porcentaje de cumplimiento y el detalle de cada correccion.</p>
         </div>
-        <button class="rv-back" data-act="volver">Volver al documento</button>
+      </div>
+
+      <!-- Tarjetas de estadisticas (mismas que en Inicio) -->
+      <div class="stats rv-stats">
+        ${tarjeta("",
+          icon("chart"),
+          score == null ? "—" : esc(score) + " %",
+          "Cumplimiento",
+          "Ver informe",
+          "tabla",
+          score
+        )}
+        ${tarjeta("error",
+          icon("search"),
+          cuentas.error || 0,
+          "Errores",
+          "Ver en el editor",
+          "editor"
+        )}
+        ${tarjeta("warning",
+          icon("clipboard"),
+          cuentas.warning || 0,
+          "Avisos",
+          "Ver en el editor",
+          "editor"
+        )}
+        ${tarjeta("info",
+          icon("info"),
+          cuentas.info || 0,
+          "Observaciones",
+          "Ver en el editor",
+          "editor"
+        )}
+        ${tarjeta("",
+          icon("docs"),
+          cuentas.all || 0,
+          "Hallazgos en total",
+          "Ver informe",
+          "tabla"
+        )}
+      </div>
+
+      <!-- Chips de filtro + descargar -->
+      <div class="rv-filtros-bar">
+        <div class="rv-header-chips">${chips}</div>
         <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
           title="Descargar el informe APA en un documento Word (.docx)"
-          aria-label="Descargar el informe APA en Word">${icon("download")}</button>
+          aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
       </div>
 
-      <div class="pane-body">
-        <div class="rv-cards">
-          <div class="rv-card rv-card-score">
-            <div class="score-ring"><span>${score == null ? "--" : esc(score)}</span><small>%</small></div>
-            <div class="rv-score-txt">
-              <div class="rv-score-title">Nivel de cumplimiento</div>
-              <span class="rv-level ${nivelTxt.clase}">${esc(nivelTxt.txt)}</span>
-            </div>
-          </div>
-          ${tarjeta("error", "✕", cuentas.error || 0, "Errores")}
-          ${tarjeta("warning", "!", cuentas.warning || 0, "Avisos")}
-          ${tarjeta("info", "i", cuentas.info || 0, "Observaciones")}
-          ${tarjeta("total", icon("clipboard"), cuentas.all || 0, "Total de hallazgos")}
+      <!-- Barra de filtros -->
+      <div class="rv-toolbar">
+        <div class="rv-search-wrap">
+          <span class="rv-search-icn">${icon("search")}</span>
+          <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
+            value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
         </div>
-
-        <div class="rv-toolbar">
-          <div class="pane-filters">${filtros}</div>
-          <div class="rv-search-wrap">
-            <span class="rv-search-icn">${icon("search")}</span>
-            <input class="rv-search" type="search" placeholder="Buscar en los hallazgos..."
-              value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
-          </div>
-          <button class="rv-filters-btn ${categoria ? "active" : ""}" data-act="filtros"
-            aria-expanded="${categoria ? "true" : "false"}">${icon("filter")}<span>Filtros</span></button>
-        </div>
-
-        ${catChips ? `<div class="rv-catbar" ${categoria ? "" : "hidden"}>${catChips}</div>` : ""}
-
-        <div class="findings">${cuerpo}</div>
-        ${pie}
+        <select id="rv-tipo" class="rv-sel" required aria-label="Tipo de hallazgo">
+          <option value="" ${filtro === "all" ? "selected" : ""}>Tipo de hallazgo</option>
+          <option value="error" ${filtro === "error" ? "selected" : ""}>Error</option>
+          <option value="warning" ${filtro === "warning" ? "selected" : ""}>Aviso</option>
+          <option value="info" ${filtro === "info" ? "selected" : ""}>Observacion</option>
+        </select>
+        <select id="rv-prioridad" class="rv-sel" required aria-label="Prioridad">
+          <option value="" ${filtro === "all" ? "selected" : ""}>Prioridad</option>
+          <option value="error" ${filtro === "error" ? "selected" : ""}>Alta</option>
+          <option value="warning" ${filtro === "warning" ? "selected" : ""}>Media</option>
+          <option value="info" ${filtro === "info" ? "selected" : ""}>Baja</option>
+        </select>
+        <button class="rv-btn-limpiar" data-act="limpiar">${icon("filter")} Limpiar filtros</button>
       </div>
+
+      <!-- Tabla CRUD -->
+      <div class="rv-tablewrap">
+        <table class="rv-table">
+          <thead>
+            <tr>
+              <th scope="col">Tipo</th>
+              <th scope="col">Descripción del hallazgo</th>
+              <th scope="col">Ubicación</th>
+              <th scope="col">Prioridad</th>
+              <th scope="col" class="rv-acc-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="rv-body">${cuerpo}</tbody>
+        </table>
+      </div>
+      ${pie}
     </div>`;
-}
-
-function contarCategorias(lista) {
-  const c = new Map();
-  lista.forEach((f) => {
-    const k = f.category || "Sin categoría";
-    c.set(k, (c.get(k) || 0) + 1);
-  });
-  return Array.from(c.entries()).sort((a, b) => b[1] - a[1]);
 }
 
 function mount(el) {
   root = el;
-  pintarAnillo(
-    (estado().summary && estado().summary.compliance_score) != null
-      ? estado().summary.compliance_score
-      : null
-  );
 
-  el.querySelectorAll(".pane-filters [data-filter]").forEach((b) =>
+  // Chips de severidad del header
+  el.querySelectorAll(".rv-chip[data-filter]").forEach((b) =>
     b.addEventListener("click", () => {
       filtro = b.dataset.filter;
       pagina = 1;
@@ -304,14 +360,54 @@ function mount(el) {
     })
   );
 
-  el.querySelectorAll(".rv-cats [data-cat]").forEach((b) =>
+  // Buscador
+  const busquedaEl = el.querySelector(".rv-search");
+  if (busquedaEl) {
+    busquedaEl.addEventListener("input", (e) => {
+      busqueda = e.target.value;
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // Filtro tipo de hallazgo
+  const tipoEl = el.querySelector("#rv-tipo");
+  if (tipoEl) {
+    tipoEl.addEventListener("change", (e) => {
+      filtro = e.target.value || "all";
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // Filtro prioridad (mapea a severidad)
+  const prioEl = el.querySelector("#rv-prioridad");
+  if (prioEl) {
+    prioEl.addEventListener("change", (e) => {
+      const v = e.target.value;
+      filtro = v || "all";
+      pagina = 1;
+      pintar();
+    });
+  }
+
+  // Limpiar filtros
+  el.querySelectorAll("[data-act=limpiar]").forEach((b) =>
     b.addEventListener("click", () => {
-      categoria = b.dataset.cat || "";
+      filtro = "all";
+      busqueda = "";
+      const inp = el.querySelector(".rv-search");
+      if (inp) inp.value = "";
+      const t = el.querySelector("#rv-tipo");
+      if (t) t.value = "";
+      const p = el.querySelector("#rv-prioridad");
+      if (p) p.value = "";
       pagina = 1;
       pintar();
     })
   );
 
+  // Paginacion
   el.querySelectorAll(".rv-pages [data-pag]").forEach((b) =>
     b.addEventListener("click", () => {
       const n = Number(b.dataset.pag);
@@ -323,47 +419,65 @@ function mount(el) {
     })
   );
 
-  const busquedaEl = el.querySelector(".rv-search");
-  if (busquedaEl) {
-    busquedaEl.addEventListener("input", (e) => {
-      busqueda = e.target.value;
-      pagina = 1;
-      pintar();
-    });
-  }
-
-  el.querySelectorAll(".findings .finding").forEach((art) =>
-    art.addEventListener("click", () => {
+  // Acciones de filas: ver / mas
+  el.querySelectorAll(".rv-iconbtn[data-act]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = Number(b.dataset.i);
       const lista = estado().findings || [];
-      if (app && app.jumpToFinding) app.jumpToFinding(lista[Number(art.dataset.i)]);
-    })
-  );
-
-  el.querySelectorAll("[data-act]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const act = b.dataset.act;
-      if (act === "volver") Router.go("correcciones");
-      else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
-      else if (act === "filtros") {
-        const barra = el.querySelector(".rv-catbar");
-        if (barra) {
-          const visible = barra.hasAttribute("hidden");
-          if (visible) barra.removeAttribute("hidden");
-          else barra.setAttribute("hidden", "");
-          b.classList.toggle("active", visible);
-          b.setAttribute("aria-expanded", visible ? "true" : "false");
-        }
+      const f = lista[i];
+      if (!f) return;
+      if (b.dataset.act === "ver") {
+        if (app && app.jumpToFinding) app.jumpToFinding(f);
+      } else if (b.dataset.act === "mas") {
+        const pop = el.querySelector(`#rv-pop-${i}`);
+        document.querySelectorAll(".rv-more-pop").forEach((m) => m.hidden = true);
+        if (pop) pop.hidden = !pop.hidden;
       }
     })
   );
+
+  // Items del menu mas
+  el.querySelectorAll(".rv-pop-item[data-act]").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const i = Number(b.dataset.i);
+      const lista = estado().findings || [];
+      const f = lista[i];
+      if (!f) return;
+      if (b.dataset.act === "corregir") {
+        if (app && app.openFixModal) app.openFixModal();
+      } else if (b.dataset.act === "descartar") {
+        if (app && app.toast) app.toast("Hallazgo descartado", "ok");
+        document.getElementById(`rv-pop-${i}`).hidden = true;
+      }
+    })
+  );
+
+  // Cerrar pop al hacer click fuera
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".rv-more-pop").forEach((m) => m.hidden = true);
+  });
+
+  // Acciones globales
+  el.querySelectorAll("[data-act]").forEach((b) => {
+    if (b.closest(".rv-iconbtn, .rv-pop-item")) return;
+    b.addEventListener("click", () => {
+      const act = b.dataset.act;
+      if (act === "volver" || act === "editor") Router.go("correcciones");
+      else if (act === "tabla") {
+        // "Ver informe" lleva a la tabla de hallazgos, que es el informe
+        const tabla = el.querySelector(".rv-tablewrap");
+        if (tabla) tabla.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (act === "descargar" && app && app.downloadReport) app.downloadReport();
+    });
+  });
 }
 
-// Repinta sin perder la posicion del scroll: el editor avisa de cada cambio.
 function pintar() {
   if (!root) return;
   const vista = document.getElementById("view");
   const scroll = vista ? vista.scrollTop : 0;
-  // al escribir en el buscador se repinta todo: se devuelve el foco al campo
   const activo = document.activeElement;
   const enBusqueda = activo && activo.classList && activo.classList.contains("rv-search");
   const pos = enBusqueda ? activo.selectionStart : null;

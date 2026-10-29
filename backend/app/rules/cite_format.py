@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 
 from backend.app.rules.base import Category, Finding, Rule, Severity
+from backend.app.services.bibliography import author_matches
 from backend.app.services.docx_parser import ParsedDocument
 
 BLOCK_MIN_WORDS = 40
@@ -32,26 +33,22 @@ class EtAlThresholdRule(Rule):
         bib = document.bibliography
         if not bib or not bib.references:
             return []
-        # solo se considera fiable un conteo confirmado por iniciales: sin ellas
-        # el conteo de autores es ambiguo ('Sanchez Perez, Juan y Lopez, Maria')
-        multi_author = {
-            r.surnames[0]
-            for r in bib.references
-            if r.surnames
-            and r.author_count >= ET_AL_THRESHOLD
-            and r.initials_count >= 2
-            and not r.corporate
-        }
-        if not multi_author:
+        multi_refs = [
+            r for r in bib.references
+            if r.surnames and r.author_count >= ET_AL_THRESHOLD
+            and r.initials_count >= 2 and not r.corporate
+        ]
+        if not multi_refs:
             return []
         findings: list[Finding] = []
         seen: set[tuple[int, str]] = set()
         for c in bib.citations:
             if not c.surnames:
                 continue
-            surname = c.surnames[0]
-            if surname not in multi_author:
+            ref = next((r for r in multi_refs if author_matches(c.surnames, r)), None)
+            if ref is None:
                 continue
+            surname = c.surnames[0]
             if c.has_et_al:
                 continue
             # cita que lista dos o mas apellidos de una obra de 3+ autores
@@ -97,24 +94,19 @@ class EtAlNotAllowedRule(Rule):
         bib = document.bibliography
         if not bib:
             return []
-        # referencias con exactamente 1 o 2 autores (conteo confirmado por iniciales
-        # para no equivocarse cuando el parser no reconoce bien los autores)
-        small_author = {
-            r.surnames[0].lower(): r
-            for r in bib.references
-            if r.surnames
-            and 1 <= r.author_count <= 2
-            and not r.corporate
-        }
+        small_refs = [
+            r for r in bib.references
+            if r.surnames and 1 <= r.author_count <= 2 and not r.corporate
+        ]
         findings: list[Finding] = []
         seen: set[tuple[int, str]] = set()
         for c in bib.citations:
             if not c.has_et_al or not c.surnames:
                 continue
-            first = c.surnames[0].lower()
-            ref = small_author.get(first)
+            ref = next((r for r in small_refs if author_matches(c.surnames, r)), None)
             if ref is None:
                 continue
+            first = c.surnames[0].lower()
             key = (c.paragraph_index, first)
             if key in seen:
                 continue

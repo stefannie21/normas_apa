@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from backend.app.rules.base import Category, Finding, Rule, Severity
-from backend.app.services.bibliography import Bibliography, first_surname
+from backend.app.services.bibliography import Bibliography, first_surname, author_matches
 from backend.app.services.docx_parser import ParsedDocument
 
 SUG_CITA = (
@@ -151,7 +151,8 @@ class YearMismatchRule(Rule):
             if not c.surnames or c.year is None:
                 continue
             same_author = [
-                r for r in bib.references if r.surnames and _similar(r.surnames[0], c.surnames[0])
+                r for r in bib.references
+                if r.surnames and author_matches(c.surnames, r)
             ]
             if not same_author:
                 continue

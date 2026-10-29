@@ -7,6 +7,12 @@ from backend.app.rules.base import Category, Finding, Rule, Severity
 from backend.app.services.docx_parser import ParsedDocument
 
 YEAR_RE = re.compile(r"\b(1[89]\d{2}|20\d{2})\b")
+PAREN_YEAR_FLEX_RE = re.compile(
+    r"\(\s*(?:[^)]*?\b)?(1[89]\d{2}|20\d{2}|\d{4})[a-z]?\b[^)]*\)",
+    re.IGNORECASE,
+)
+PAREN_NO_DATE_RE = re.compile(r"\(\s*(?:s\.?\s*f\.?|n\.?\s*d\.?)\s*\)", re.IGNORECASE)
+YEAR_GENERAL_RE = re.compile(r"\b(1[89]\d{2}|20\d{2})\b")
 HANGING_TOLERANCE_IN = 0.1
 DOI_PLAIN_RE = re.compile(r"\bdoi:\s*10\.", re.IGNORECASE)
 URL_RE = re.compile(r"https?://", re.IGNORECASE)
@@ -130,19 +136,33 @@ class ReferenceYearRule(Rule):
 
     def check(self, document: ParsedDocument) -> list[Finding]:
         findings: list[Finding] = []
+        bib = document.bibliography
+        bib_years: set[int] = set()
+        if bib and bib.references:
+            bib_years = {r.paragraph_index for r in bib.references if r.year is not None}
+
         for p in document.reference_paragraphs():
             if len(p.text.strip()) < 15:
                 continue
-            if not YEAR_RE.search(p.text):
-                findings.append(
-                    self.finding(
-                        "Referencia sin año de publicación.",
-                        paragraph_index=p.index,
-                        location=f"Párrafo {p.index + 1}",
-                        excerpt=p.excerpt(),
-                        suggestion="Incluir el año entre paréntesis: (2020).",
-                    )
+            # 1. Si la referencia estructurada ya identificó el año para este párrafo
+            if p.index in bib_years:
+                continue
+            # 2. Patrón flexible de año (AAAA) o sin fecha (s.f.) entre paréntesis en el encabezado/texto
+            if PAREN_YEAR_FLEX_RE.search(p.text) or PAREN_NO_DATE_RE.search(p.text):
+                continue
+            # 3. Detección general de año de 4 dígitos en el texto
+            if YEAR_GENERAL_RE.search(p.text):
+                continue
+
+            findings.append(
+                self.finding(
+                    "Referencia sin año de publicación.",
+                    paragraph_index=p.index,
+                    location=f"Párrafo {p.index + 1}",
+                    excerpt=p.excerpt(),
+                    suggestion="Incluir el año entre paréntesis: (2020).",
                 )
+            )
         return findings
 
 
