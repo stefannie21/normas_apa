@@ -8,6 +8,7 @@ import { SessionStore } from "./storage.js";
 import { Ribbon } from "./ribbon.js";
 import { Router } from "../core/router.js";
 import { Library } from "../library.js";
+import { Dom } from "../core/dom.js";
 
 const App = (function () {
   "use strict";
@@ -931,23 +932,25 @@ const App = (function () {
     paneFindings.innerHTML = lista
       .map((f) => {
         const idx = currentFindings.indexOf(f);
-        return `<article class="finding ${escapeHtml(f.severity || "")}" data-pi="${idx}">
-          <div class="finding-rail">
-            <span class="dot">${SEVERITY_ICON[f.severity] || ""}</span>
-            <span class="finding-sev">${SEV_TEXT[f.severity] || ""}</span>
+        const sev = f.severity || "info";
+        const icono =
+          sev === "error"
+            ? Dom.icon("error")
+            : sev === "warning"
+              ? Dom.icon("alert")
+              : Dom.icon("info");
+        return `<article class="finding ${escapeHtml(sev)}" data-pi="${idx}">
+          <div class="finding-head">
+            <span class="finding-icn">${icono}</span>
+            <span class="finding-cat">${escapeHtml(f.category || "")}</span>
+            <span class="finding-rule">${escapeHtml(f.rule_id || "")}</span>
           </div>
-          <div class="finding-body">
-            <div class="finding-head">
-              <span class="finding-cat">${escapeHtml(f.category || "")}</span>
-              <span class="finding-rule">${escapeHtml(f.rule_id || "")}</span>
-            </div>
-            <p class="finding-msg">${escapeHtml(f.message || "")}</p>
-            ${
-              f.suggestion
-                ? `<p class="finding-sug"><b>Sugerencia:</b> ${escapeHtml(f.suggestion)}</p>`
-                : ""
-            }
-          </div>
+          <p class="finding-msg">${escapeHtml(f.message || "")}</p>
+          ${
+            f.suggestion
+              ? `<p class="finding-sug"><b>Sugerencia:</b> ${escapeHtml(f.suggestion)}</p>`
+              : ""
+          }
         </article>`;
       })
       .join("");
