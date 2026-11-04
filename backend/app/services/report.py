@@ -41,6 +41,10 @@ def build_report(result: AnalysisResult, ai_findings: list | None = None) -> dic
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "summary": summary,
         "findings": [f.to_dict() for f in findings],
+        # Solo auditoria: los hallazgos descartados NO se incluyen nunca en
+        # "findings", por lo que no llegan al editor ni al informe Word.
+        "validation": getattr(result, "validation", {}) or {},
+        "precision": getattr(result, "precision", {}) or {},
     }
     if ai_findings:
         notes = getattr(result, "ai_notes", None) or []

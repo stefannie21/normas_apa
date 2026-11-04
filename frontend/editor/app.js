@@ -1112,15 +1112,68 @@ const App = (function () {
     return c;
   }
 
+  function calculateComplianceScore(findings, totalParas) {
+    if (!lastSummary && (!findings || !findings.length)) return null;
+    const paras = (lastSummary && lastSummary.paragraphs) || totalParas || 1;
+    let errors = 0, warnings = 0, infos = 0;
+    (findings || []).forEach((f) => {
+      if (f.severity === "error") errors++;
+      else if (f.severity === "warning") warnings++;
+      else if (f.severity === "info") infos++;
+    });
+    if (!findings || findings.length === 0) return 100;
+    const docLevel = Math.min(35.0, errors * 4.0) + Math.min(25.0, warnings * 1.5) + Math.min(10.0, infos * 0.5);
+    const perParagraph = Math.min(100.0, ((errors * 1.0 + warnings * 0.4 + infos * 0.1) / Math.max(paras, 1)) * 100.0);
+    return Math.max(0, Math.min(100, Math.round(100 - docLevel - perParagraph)));
+  }
+
+  function currentSummary() {
+    if (!lastSummary) return null;
+    const activeFindings = currentFindings || [];
+    const counts = countBy(activeFindings);
+    const byCategory = {};
+    activeFindings.forEach((f) => {
+      if (f.category) {
+        byCategory[f.category] = (byCategory[f.category] || 0) + 1;
+      }
+    });
+    return {
+      ...lastSummary,
+      total_findings: activeFindings.length,
+      by_severity: {
+        error: counts.error || 0,
+        warning: counts.warning || 0,
+        info: counts.info || 0,
+      },
+      by_category: byCategory,
+      compliance_score: calculateComplianceScore(activeFindings, lastSummary.paragraphs),
+    };
+  }
+
   /* Estado del informe para la vista "Reportes" y el panel de Inicio. */
   function reportState() {
+    const summ = currentSummary();
     return {
       ready: lastSummary != null || allFindings.length > 0,
-      summary: lastSummary,
+      summary: summ,
       findings: currentFindings.slice(),
       counts: countBy(currentFindings),
       hasFile: !!currentFile,
     };
+  }
+
+  function discardFinding(f) {
+    if (!f) return;
+    const i = allFindings.indexOf(f);
+    if (i !== -1) {
+      resolvedIdx.add(i);
+      refreshCurrentFindings();
+      markInDocument(true);
+      if (reportPane && !reportPane.hidden) renderPane();
+      notifyChange();
+      persistReport();
+      showToast("Hallazgo descartado", "ok");
+    }
   }
 
   function normKey(t) {
@@ -1541,6 +1594,7 @@ const App = (function () {
     /* ---------- Estado para el panel de Inicio ---------- */
     state() {
       const text = (Pager.textOf(page) || "").trim();
+      const summ = currentSummary();
       return {
         name: currentFile ? currentFile.name : "",
         pages: totalPages || page.querySelectorAll(".sheet").length,
@@ -1548,10 +1602,10 @@ const App = (function () {
         dirty,
         savedAt: lastSavedAt || "",
         score:
-          lastSummary && lastSummary.compliance_score != null
-            ? lastSummary.compliance_score
+          summ && summ.compliance_score != null
+            ? summ.compliance_score
             : null,
-        counts: countBy(allFindings),
+        counts: countBy(currentFindings),
         ruleCount: RULE_COUNT,
       };
     },
@@ -1570,6 +1624,9 @@ const App = (function () {
     },
     report() {
       return reportState();
+    },
+    discardFinding(f) {
+      discardFinding(f);
     },
     downloadReport() {
       return downloadReportDocx();

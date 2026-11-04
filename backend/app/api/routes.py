@@ -14,8 +14,16 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from backend.app.config import get_settings
+from backend.app.rules import pending
 from backend.app.rules.registry import get_rules
-from backend.app.services import ai_filter, ai_reviewer, pdf_service, report
+from backend.app.services import (
+    ai_filter,
+    ai_reviewer,
+    citation_guard,
+    pdf_service,
+    precision,
+    report,
+)
 from backend.app.services.analyzer import analyze
 from backend.app.services.docx_parser import (
     empty_paragraph_marks,
@@ -50,9 +58,21 @@ def list_rules() -> dict:
                 "category": r.category.value,
                 "description": r.description,
                 "severity": r.default_severity.value,
+                "norm_source": r.norm_source,
+                "exceptions": r.exceptions,
             }
             for r in get_rules()
         ]
+    }
+
+
+@router.get("/rules/pending")
+def list_pending_rules() -> dict:
+    """Criterios normativos en duda: NO producen observaciones (seccion 3)."""
+    return {
+        "count": len(pending.PENDING),
+        "by_family": pending.by_family(),
+        "pending": pending.as_dicts(),
     }
 
 
@@ -536,6 +556,19 @@ def ai_classify_endpoint(
     findings, notes, used_model = ai_reviewer.classify_references(
         document, settings, rule_findings=rule_findings
     )
+    # Las observaciones creadas por la IA pasan por la MISMA puerta
+    # determinista que las del motor de reglas (sin IA, sin clave): apellidos
+    # inventados, fragmentos fabricados, evidencia no verificable, estados no
+    # reportables y duplicados se descartan antes de llegar al editor.
+    gate = precision.finalize(document, findings, rules=[], build_ledger=False)
+    findings = gate.kept
+    notes = list(notes)
+    if gate.discarded:
+        motivos = ", ".join(f"{k} ({v})" for k, v in sorted(gate.reasons.items()))
+        notes.append(
+            f"Verificacion determinista: se descartaron {len(gate.discarded)} "
+            f"observacion(es) de la IA: {motivos}."
+        )
     # Filtro IA de falsos positivos + sugerencias de correccion (opt-in).
     filter_result = ai_filter.filter_findings(document, rule_findings)
     dismissed = [f.to_dict() for f in filter_result.dismissed]
@@ -583,3 +616,23 @@ def export_endpoint(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{out_name}"'},
     )
+
+
+@router.post("/orchestrate")
+def orchestrate_endpoint(
+    file: UploadFile = File(...),
+    consent: int = Form(0),
+    document_id: str = Form("doc_default"),
+    document_version: str = Form("1.0"),
+) -> JSONResponse:
+    """Orquestación central de tareas APA con especialistas de IA y anclaje preciso."""
+    from backend.app.services.apa_task_orchestrator import task_orchestrator
+
+    document = _load_doc(file)
+    res = task_orchestrator.orchestrate(
+        document=document,
+        document_id=document_id,
+        document_version=document_version,
+        enable_ai=(consent == 1),
+    )
+    return JSONResponse(res.to_dict())

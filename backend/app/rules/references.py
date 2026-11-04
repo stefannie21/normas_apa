@@ -20,6 +20,8 @@ URL_RE = re.compile(r"https?://", re.IGNORECASE)
 
 def _sort_key(text: str) -> str:
     text = text.strip().lower()
+    # Limpiar posibles prefijos de viñetas o numeración antes del autor
+    text = re.sub(r"^[\s•\-*\d\.\[\]()]+", "", text).strip()
     text = unicodedata.normalize("NFKD", text)
     text = "".join(c for c in text if not unicodedata.combining(c))
     return text

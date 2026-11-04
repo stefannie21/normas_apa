@@ -5,18 +5,20 @@ import re
 from backend.app.rules.base import Category, Finding, Rule, Severity
 from backend.app.services.docx_parser import ParsedDocument, ParagraphInfo
 
-# APA 7 - formato por nivel de titulo.
-# Nivel 1: centrado, negrita, mayuscula de titulo
+HEADINGS_URL = "https://apastyle.apa.org/style-grammar-guidelines/paper-format/headings"
+
+# APA 7 - formato por nivel de titulo (pagina oficial "Headings").
+# Nivel 1: centrado, negrita, titulo en mayuscula de titulo
 # Nivel 2: izquierda, negrita
 # Nivel 3: izquierda, negrita cursiva
-# Nivel 4: sangrado, negrita, termina en punto
-# Nivel 5: sangrado, negrita cursiva, termina en punto
+# Nivel 4: sangrado, negrita, termina en punto, EN LINEA con el texto
+# Nivel 5: sangrado, negrita cursiva, termina en punto, EN LINEA
 HEADING_SPEC = {
-    1: {"alignment": "center", "bold": True, "italic": False},
-    2: {"alignment": "left", "bold": True, "italic": False},
-    3: {"alignment": "left", "bold": True, "italic": True},
-    4: {"alignment": "left", "bold": True, "italic": False},
-    5: {"alignment": "left", "bold": True, "italic": True},
+    1: {"alignment": "center", "bold": True, "italic": False, "indented": False, "period": False},
+    2: {"alignment": "left", "bold": True, "italic": False, "indented": False, "period": False},
+    3: {"alignment": "left", "bold": True, "italic": True, "indented": False, "period": False},
+    4: {"alignment": "left", "bold": True, "italic": False, "indented": True, "period": True},
+    5: {"alignment": "left", "bold": True, "italic": True, "indented": True, "period": True},
 }
 
 
@@ -29,26 +31,57 @@ def _run_style(paragraph: ParagraphInfo) -> tuple[bool, bool]:
     return bold, italic
 
 
+def _bold_prefix(paragraph: ParagraphInfo) -> str:
+    """Texto en negrita al inicio del parrafo (encabezados en linea 4/5)."""
+    out: list[str] = []
+    for r in paragraph.runs:
+        if r.bold and r.text.strip():
+            out.append(r.text)
+        elif r.text.strip():
+            break
+    return "".join(out).strip()
+
+
+def _inline_period_ok(paragraph: ParagraphInfo) -> bool:
+    """Nivel 4/5: el encabezado en linea termina con punto."""
+    prefix = _bold_prefix(paragraph)
+    if prefix:
+        return prefix.rstrip().endswith(".")
+    return paragraph.text.strip().endswith(".")
+
+
+def _indented(paragraph: ParagraphInfo) -> bool:
+    return (
+        (paragraph.first_line_indent_in or 0) >= 0.4
+        or (paragraph.left_indent_in or 0) >= 0.4
+    )
+
+
 class StructureRule(Rule):
+    """NO regla: los encabezados son opcionales en APA 7.
+
+    La pagina oficial dice 'short student papers may not require any headings'
+    y 'use only the number of headings necessary'. La version anterior emitia
+    una observacion (aunque INFO) cuando no habia titulos: convertia un
+    elemento opcional en un supuesto incumplimiento. Se conserva el ID por
+    compatibilidad, pero se registra como NOT_APPLICABLE y no genera hallazgos.
+    """
+
     def __init__(self) -> None:
         super().__init__(
             id="HEAD-001",
-            name="Estructura de títulos",
+            name="Estructura de títulos (opcional)",
             category=Category.TITULOS,
-            description="El documento debe organizar el contenido mediante títulos y subtítulos con estilos.",
+            description=(
+                "APA 7 no exige encabezados en todos los trabajos; se usan solo "
+                "los niveles necesarios. Esta regla no genera observaciones."
+            ),
             default_severity=Severity.INFO,
+            norm_source=HEADINGS_URL,
+            exceptions="Trabajos estudiantiles cortos pueden no tener ningún encabezado.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
-        headings = [p for p in document.body_paragraphs if p.heading_level]
-        if not headings:
-            return [
-                self.finding(
-                    "No se detectaron títulos con estilos de encabezado. APA recomienda jerarquizar el contenido.",
-                    location="Documento",
-                    suggestion="Aplicar estilos Título 1, Título 2, etc. (Heading 1, Heading 2...) según la jerarquía.",
-                )
-            ]
         return []
 
 
@@ -58,7 +91,16 @@ class HeadingLevelFormatRule(Rule):
             id="HEAD-002",
             name="Formato de títulos por nivel",
             category=Category.TITULOS,
-            description="Cada nivel de título debe cumplir el formato APA (alineación, negrita, cursiva).",
+            description=(
+                "Cada nivel de título debe cumplir el formato APA: alineación, "
+                "negrita, cursiva, sangría y puntuación para niveles 4 y 5."
+            ),
+            norm_source=HEADINGS_URL,
+            exceptions=(
+                "Mayúscula de tipo título (title case) no se verifica: en español "
+                "no hay evidencia determinista suficiente. Niveles 4/5 son "
+                "encabezados en línea; se evalúa el fragmento en negrita."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -72,58 +114,66 @@ class HeadingLevelFormatRule(Rule):
                 continue
             bold, italic = _run_style(p)
 
-            problems = []
-            if not bold:
+            problems: list[str] = []
+            if not bold and not (level in (4, 5) and _bold_prefix(p)):
                 problems.append("debe ir en negrita")
             if italic != spec["italic"]:
                 problems.append("debe ir en cursiva" if spec["italic"] else "no debe ir en cursiva")
             if level in (1, 2, 3) and p.alignment not in (spec["alignment"], None):
                 expected = "centrado" if spec["alignment"] == "center" else "a la izquierda"
                 problems.append(f"debe alinearse {expected}")
+            if spec["indented"] and not _indented(p):
+                problems.append("debe llevar sangría de 0.5 in")
+            if spec["period"] and not _inline_period_ok(p):
+                problems.append("debe terminar con punto y el texto sigue en la misma línea")
 
             if problems:
+                expected = (
+                    f"Nivel {level}: "
+                    f"{'centrado' if spec['alignment'] == 'center' else 'izquierda'}, "
+                    f"negrita{' y cursiva' if spec['italic'] else ''}"
+                    f"{', sangrado y punto final antes del texto' if spec['indented'] else ''}."
+                )
                 findings.append(
                     self.finding(
-                        f"Título nivel {level} incumple el formato APA: {', '.join(problems)}.",
+                        f"Título de nivel {level} incumple el formato APA 7: {', '.join(problems)}.",
                         paragraph_index=p.index,
                         location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
-                        suggestion=(
-                            f"Nivel {level}: {'centrado' if spec['alignment'] == 'center' else 'izquierda'}, "
-                            f"{'negrita' if spec['bold'] else 'sin negrita'}"
-                            f"{' y cursiva' if spec['italic'] else ''}."
-                        ),
+                        suggestion=expected,
+                        extra={"heading_level": level, "problems": problems},
                     )
                 )
         return findings
 
 
 class HeadingHierarchyRule(Rule):
+    """Continuidad de niveles, sin exigir que el primer titulo sea nivel 1.
+
+    La pagina oficial: el titulo del trabajo actua como nivel 1 de facto, la
+    introduccion NO lleva encabezado y sus subapartados pueden ser nivel 2/3.
+    Por tanto 'el primer titulo debe ser nivel 1' era un falso positivo.
+    """
+
     def __init__(self) -> None:
         super().__init__(
             id="HEAD-003",
             name="Jerarquía de títulos sin saltos",
             category=Category.TITULOS,
-            description="El primer nivel debe ser 1 y no deben saltarse niveles (1 -> 3).",
+            description="No deben saltarse niveles de encabezado (1 -> 3).",
+            norm_source=HEADINGS_URL,
+            exceptions=(
+                "El título del trabajo actúa como nivel 1 de facto; la "
+                "introducción no lleva encabezado y puede empezar en nivel 2/3."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
         findings: list[Finding] = []
         headings = [p for p in document.body_paragraphs if p.heading_level]
-        if not headings:
+        if len(headings) < 2:
             return findings
-        first = headings[0]
-        if first.heading_level != 1:
-            findings.append(
-                self.finding(
-                    f"El primer título es de nivel {first.heading_level}; APA espera empezar en nivel 1.",
-                    paragraph_index=first.index,
-                    location=f"Párrafo {first.index + 1}",
-                    excerpt=first.excerpt(),
-                    suggestion="Usar un título de nivel 1 para el primer encabezado del documento.",
-                )
-            )
-        prev = 1
+        prev = headings[0].heading_level or 1
         for p in headings[1:]:
             level = p.heading_level or 1
             if level > prev + 1:
@@ -134,6 +184,7 @@ class HeadingHierarchyRule(Rule):
                         location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
                         suggestion="No saltar niveles; usar el nivel inmediatamente inferior.",
+                        extra={"from_level": prev, "to_level": level},
                     )
                 )
             prev = level
@@ -141,8 +192,18 @@ class HeadingHierarchyRule(Rule):
 
 
 HEADING_NUMBER_RE = re.compile(r"^\s*(\d+)(?:[.)]\d+)*[.)]?\s+\S")
+NUMBERED_HEADING_RE = re.compile(
+    r"^\s*(?:\d+(?:[.)]\d+)*[.)]?|[A-ZÁÉÍÓÚÑ][.)])\s+\S"
+)
 TOC_ENTRY_RE = re.compile(r"[.\u2026]{3,}|\t|\s{2,}\s*\d{1,3}\s*$")
 LETTERS_RE = re.compile(r"[A-Za-z\u00c0-\u00ff]")
+# Excepciones: rotulos de elementos, anexos y capitulos de tesis (perfil
+# institucional, fuera del alcance de esta etapa).
+NUMBERING_EXEMPT_RE = re.compile(
+    r"^\s*(?:anexo|ap[eé]ndice|appendix|figura|figure|tabla|table|"
+    r"cap[ií]tulo|chapter|resumen|abstract)\b",
+    re.IGNORECASE,
+)
 
 
 def _is_uppercase(text: str) -> bool:
@@ -167,11 +228,67 @@ def _looks_like_old_toc_entry(paragraph: ParagraphInfo) -> bool:
     return bool(TOC_ENTRY_RE.search(paragraph.text))
 
 
-class HeadingStyleRule(Rule):
-    """Detecta parrafos que parecen titulos pero NO usan estilos nativos de Word.
+class NumberedHeadingRule(Rule):
+    """APA 7: 'Do not label headings with numbers or letters'.
 
-    Sin estilo 'Heading 1/2/3' el indice automatico de Word no los incluye,
-    por lo que se reportan como error con su ubicacion exacta.
+    Solo se evalúan párrafos que YA usan un estilo de encabezado de Word: hay
+    evidencia estructural de que son títulos, no párrafos numerados ni tablas.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            id="HEAD-005",
+            name="Encabezados sin numeración",
+            category=Category.TITULOS,
+            description="APA 7 prohíbe etiquetar los encabezados con números o letras.",
+            norm_source=HEADINGS_URL,
+            exceptions=(
+                "Índice/TOC; rótulos de figuras, tablas, anexos y apéndices; "
+                "capítulos de tesis (perfil institucional excluido en esta etapa); "
+                "entradas de la lista de referencias."
+            ),
+        )
+
+    def check(self, document: ParsedDocument) -> list[Finding]:
+        # Excepción de perfil institucional: si la institución autoriza o exige títulos numerados
+        if getattr(document, "allow_numbered_headings", False) or getattr(document, "institutional_profile", {}).get("allow_numbered_headings", False):
+            return []
+        findings: list[Finding] = []
+        for p in document.body_paragraphs:
+            if not p.heading_level:
+                continue
+            text = p.text.strip()
+            if not text or NUMBERING_EXEMPT_RE.match(text):
+                continue
+            if _looks_like_old_toc_entry(p):
+                continue
+            if document.references_start is not None and p.index >= document.references_start:
+                continue
+            if not NUMBERED_HEADING_RE.match(text):
+                continue
+            findings.append(
+                self.finding(
+                    f"El encabezado '{p.excerpt(80)}' está numerado; APA 7 no "
+                    "etiqueta los títulos con números ni letras.",
+                    paragraph_index=p.index,
+                    location=f"Página {p.estimated_page} (párrafo {p.index + 1})",
+                    excerpt=p.excerpt(90),
+                    suggestion=(
+                        "Quitar el número o la letra del encabezado y mantener "
+                        "la jerarquía con el estilo de Word correspondiente."
+                    ),
+                    extra={"heading_numbered": True, "heading_level": p.heading_level},
+                )
+            )
+        return findings
+
+
+class HeadingStyleRule(Rule):
+    """Parrafos que parecen titulos pero NO usan estilos nativos de Word.
+
+    Precision: NO se determina el nivel por el tamaño ni por la negrita
+    aislada. Se exige estilo de Word, contexto estructural y al menos dos
+    señales, y se excluyen los capitulos de tesis (perfil institucional).
     """
 
     def __init__(self) -> None:
@@ -180,14 +297,19 @@ class HeadingStyleRule(Rule):
             name="Títulos sin estilo de encabezado",
             category=Category.TITULOS,
             description=(
-                "Los párrafos que parecen títulos (negrita, mayúsculas o tamaño mayor) "
-                "deben usar los estilos Título 1, Título 2 o Título 3 de Word; de lo "
-                "contrario el índice automático no los reconoce."
+                "Los párrafos que funcionan como títulos deben usar los estilos "
+                "de encabezado de Word; el índice automático no los reconoce "
+                "si solo están en negrita o en un tamaño mayor."
             ),
             default_severity=Severity.ERROR,
+            norm_source=HEADINGS_URL,
+            exceptions=(
+                "Portada, índice/TOC, rótulos de tablas/figuras, lista de "
+                "referencias, capítulos de tesis y apéndices. No se infiere el "
+                "nivel por el tamaño de fuente ni por la negrita aislada."
+            ),
         )
 
-    # -- senales de "parece titulo" -------------------------------------
     def _signals(self, p: ParagraphInfo, document: ParsedDocument) -> list[str]:
         signals: list[str] = []
         text = p.text.strip()
@@ -195,14 +317,8 @@ class HeadingStyleRule(Rule):
             signals.append("Mayúsculas")
         if _bold_ratio(p) >= 0.6:
             signals.append("Negrita")
-        size = p.max_size_pt
-        base = document.default_font_size_pt or 12.0
-        if size is not None and size > base + 0.6:
-            signals.append("Tamaño mayor")
-        elif size is not None and size >= 14.0:
-            signals.append("Tamaño mayor")
-        if HEADING_NUMBER_RE.match(text):
-            signals.append("Numeración de capítulo")
+        if NUMBERING_EXEMPT_RE.match(text):
+            signals.append("Rótulo estructural")
         return signals
 
     def _is_candidate(
@@ -213,43 +329,36 @@ class HeadingStyleRule(Rule):
         paragraphs: list[ParagraphInfo] | None = None,
     ) -> bool:
         text = p.text.strip()
-        if not text or p.heading_level:  # ya usa estilo de titulo
+        if not text or p.heading_level:
             return False
-        if p.is_list_item:
+        if p.is_list_item or p.in_table or getattr(p, "has_image", False):
             return False
+        try:
+            if document.is_chapter_title(p) or document.is_cover_paragraph(p):
+                return False
+        except Exception:
+            pass
         if len(text) > 120 or len(text.split()) > 14:
             return False
         if _looks_like_old_toc_entry(p):
             return False
         if document.references_start is not None and p.index > document.references_start:
             return False
-        # una frase normal terminada en punto y con mas de 8 palabras no es un titulo
+        if NUMBERING_EXEMPT_RE.match(text):
+            return False
         if text.endswith((".", ",", ";", ":")) and len(text.split()) > 8:
             return False
-        # una cita textual centrada no es un encabezado
         if p.alignment == "center" and len(text.split()) > 10:
             return False
-
-        signals = self._signals(p, document)
-        if not signals:
-            return False
-        # La negrita aislada NO basta: en una tesis hay palabras resaltadas en
-        # negrita en casi todos los parrafos. Se exige una senal estructural o,
-        # en su defecto, que el contexto sea tipico de un encabezado.
-        strong = {"Mayúsculas", "Tamaño mayor", "Numeración de capítulo"}
-        if set(signals) & strong:
-            # si es solo "mayusculas", ademas debe ser una linea corta y sin punto final
-            if signals == ["Mayúsculas"] and len(text.split()) > 8:
-                return False
-            return True
         return self._looks_like_heading_by_context(
             index, paragraphs if paragraphs is not None else [p]
         )
 
     @staticmethod
     def _looks_like_heading_by_context(index: int, paragraphs: list[ParagraphInfo]) -> bool:
-        """Linea corta en negrita, precedida de un titulo/vacio y seguida de un
-        parrafo largo: es un encabezado con formato manual, no una frase resaltada."""
+        """Linea corta, aislada y seguida de un parrafo de cuerpo."""
+        if index >= len(paragraphs):
+            return False
         current = paragraphs[index]
         prev = paragraphs[index - 1] if index > 0 else None
         nxt = paragraphs[index + 1] if index + 1 < len(paragraphs) else None
@@ -273,37 +382,34 @@ class HeadingStyleRule(Rule):
         findings: list[Finding] = []
         paragraphs = document.body_paragraphs
         for index, p in enumerate(paragraphs):
-            # Excepcion de portada/caratula: los nombres de instituciones,
-            # universidades, facultades y titulos de la investigacion en la
-            # primera pagina se mantienen en estilo Normal (no entran al Indice).
-            if getattr(p, "estimated_page", 1) == 1:
-                continue
+            if getattr(p, "estimated_page", 1) == 1 and index < 6:
+                continue  # portada
             if not self._is_candidate(p, document, index, paragraphs):
                 continue
             signals = self._signals(p, document)
-            if not (set(signals) & {"Mayúsculas", "Tamaño mayor", "Numeración de capítulo"}):
-                signals = signals + ["Encabezado por contexto"]
+            # Al menos DOS señales independientes: el tamaño ya no se usa y la
+            # negrita aislada no basta.
+            if len(signals) < 2:
+                continue
             style = (p.style_name or "Normal").strip() or "Normal"
-            detected = " / ".join(dict.fromkeys(signals))
-            level_guess = 2 if HEADING_NUMBER_RE.match(p.text.strip()) and "." in p.text.strip()[:6] else 1
             findings.append(
                 self.finding(
-                    f"Título sin estilo asignado: \"{p.excerpt(90)}\" - "
-                    f"Formato detectado: {detected} (Estilo actual: {style}).",
+                    f"Título sin estilo asignado: \"{p.excerpt(90)}\". "
+                    f"Señales: {' / '.join(dict.fromkeys(signals))} "
+                    f"(Estilo actual: {style}).",
                     paragraph_index=p.index,
                     location=f"Página {p.estimated_page} (párrafo {p.index + 1})",
                     excerpt=p.excerpt(90),
                     suggestion=(
-                        f"Aplicar el estilo 'Título {level_guess}' de Word a este párrafo "
-                        f"para que aparezca en el índice automático."
+                        "Aplicar el estilo de encabezado de Word que corresponda "
+                        "a su jerarquía real (Título 1, 2 o 3), sin numerar el texto."
                     ),
                     extra={
                         "heading_style_missing": True,
                         "page": p.estimated_page,
                         "text": p.excerpt(120),
-                        "detected_format": detected,
+                        "detected_format": " / ".join(signals),
                         "style_name": style,
-                        "suggested_level": level_guess,
                     },
                 )
             )
@@ -315,4 +421,5 @@ RULES = [
     HeadingLevelFormatRule(),
     HeadingHierarchyRule(),
     HeadingStyleRule(),
+    NumberedHeadingRule(),
 ]

@@ -51,6 +51,20 @@ class EtAlThresholdRule(Rule):
             surname = c.surnames[0]
             if c.has_et_al:
                 continue
+            # Excepción normativa APA 7 (sec. 8.18 - Evitar ambigüedad):
+            # Si existen múltiples obras en la bibliografía que comparten el primer
+            # autor y el mismo año de publicación, APA 7 exige listar los autores
+            # necesarios para distinguir las obras antes de 'et al.' o nombrando a los autores.
+            is_disambiguation = any(
+                r != ref
+                and r.surnames
+                and r.surnames[0].lower() == ref.surnames[0].lower()
+                and r.year is not None
+                and r.year == ref.year
+                for r in bib.references
+            )
+            if is_disambiguation:
+                continue
             # cita que lista dos o mas apellidos de una obra de 3+ autores
             if len(c.surnames) >= 2:
                 key = (c.paragraph_index, surname.lower())
@@ -227,20 +241,32 @@ class CitationPeriodRule(Rule):
             after = text[pos + len(c.raw) :]
             is_block = c.block_quote
             if is_block:
-                # en bloque el punto debe ir ANTES del parentesis
-                if before.endswith("."):
+                # En la cita en bloque el punto final de la oración va ANTES del paréntesis
+                # de la fuente y no debe haber punto después (APA 7, sección 8.27).
+                if after.lstrip().startswith("."):
                     findings.append(
                         self.finding(
-                            "En la cita en bloque el punto va antes del paréntesis.",
+                            "En la cita en bloque no debe haber punto después del paréntesis de la cita.",
+                            paragraph_index=p.index,
+                            location=f"Página {c.page} (párrafo {p.index + 1})",
+                            excerpt=p.excerpt(140),
+                            suggestion="Eliminar el punto después del paréntesis; el punto final de la cita en bloque va antes.",
+                            extra={"bib_kind": "period_after_block_citation"},
+                        )
+                    )
+                elif not before.endswith("."):
+                    findings.append(
+                        self.finding(
+                            "En la cita en bloque el punto final debe ir antes del paréntesis de la fuente.",
                             paragraph_index=p.index,
                             location=f"Página {c.page} (párrafo {p.index + 1})",
                             excerpt=p.excerpt(140),
                             suggestion="Mover el punto antes del paréntesis de la cita.",
-                            extra={"bib_kind": "period_in_block"},
+                            extra={"bib_kind": "missing_period_before_block_citation"},
                         )
                     )
             else:
-                # en cita corta el punto va DESPUES del parentesis
+                # En cita parentética corta el punto va DESPUÉS del paréntesis (APA 7, sección 8.25).
                 if before.endswith("."):
                     findings.append(
                         self.finding(

@@ -76,6 +76,10 @@ const Marker = (function () {
 
   function locate(f) {
     const all = blocks();
+    const anchor = f.anchor || (f.extra && f.extra.anchor);
+    if (anchor && anchor.paragraph_index != null && all[anchor.paragraph_index]) {
+      return all[anchor.paragraph_index];
+    }
     if (f.excerpt && f.excerpt.length > 8) {
       const hit = all.find((el) => startsWithFragment(el, f.excerpt));
       if (hit) return hit;
@@ -185,8 +189,10 @@ const Marker = (function () {
       registry.set(String(i), f);
       const cls = SEV[f.severity] || SEV.info;
       let span = null;
-      if (f.excerpt && f.excerpt.length > 8) {
-        span = wrapText(el, f.excerpt.slice(0, 60), cls, f, i);
+      const anchor = f.anchor || (f.extra && f.extra.anchor);
+      const targetText = (anchor && anchor.matched_text) || f.excerpt || "";
+      if (targetText && targetText.trim().length >= 3) {
+        span = wrapText(el, targetText.trim().slice(0, 90), cls, f, i);
       }
       if (!span) {
         // sin fragmento localizable: se marca el parrafo entero en el margen.
