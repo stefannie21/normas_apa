@@ -624,6 +624,19 @@ const App = (function () {
         return;
       }
       aiFindings = payload.findings || [];
+      const dismissed = payload.dismissed || [];
+      // La IA descarta falsos positivos: se retiran del informe (con motivo)
+      // y se avisa al usuario. El usuario puede revisar el log de descartes.
+      if (dismissed.length) {
+        const clave = (f) =>
+          (f.rule_id || "") + "|" + (f.paragraph_index != null ? f.paragraph_index : "") + "|" + (f.message || "");
+        const descartadas = new Set(dismissed.map(clave));
+        lastFindings = lastFindings.filter((f) => !descartadas.has(clave(f)));
+        showToast(
+          "IA descarto " + dismissed.length + " hallazgo(s) como falso(s) positivo(s).",
+          "info"
+        );
+      }
       if (!lastFindings.length) await runAnalysisQuiet();
       renderReport({ summary: lastSummary, findings: lastFindings.concat(aiFindings) });
       openReportes();
@@ -632,10 +645,10 @@ const App = (function () {
       (payload.notes || []).forEach((n) => showToast(n, "info"));
       statusMsg.textContent = "";
       showToast(
-        aiFindings.length
-          ? "IA: " + aiFindings.length + " sugerencia(s) con " + (payload.model || "")
-          : "IA (" + (payload.model || "") + "): sin sugerencias",
-        aiFindings.length ? "ok" : "info"
+        (aiFindings.length ? "IA: " + aiFindings.length + " sugerencia(s)" : "IA sin sugerencias") +
+          (dismissed.length ? " · " + dismissed.length + " descartado(s)" : "") +
+          " con " + (payload.model || ""),
+        aiFindings.length || dismissed.length ? "ok" : "info"
       );
     } catch (err) {
       statusMsg.textContent = "";
