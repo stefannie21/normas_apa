@@ -990,7 +990,7 @@ body.reading #page { cursor: default; }
 .report-pane .pane-cats button:hover { border-color: #b9d2f2; color: var(--accent); }
 .report-pane .pane-cats button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 /* dentro del panel el hallazgo va en columna: no cabe a lo ancho */
-.report-pane .finding { flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px; }
+.report-pane .finding { display: flex !important; flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px; }
 .report-pane .finding-icn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; flex: 0 0 26px; }
 .report-pane .finding-icn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
 .report-pane .finding.error .finding-icn { background: #fdecea; color: var(--error); }
