@@ -246,45 +246,150 @@ body {
 .hero-btn:hover { background: #1558b8; }
 .hero-btn .btn-arrow { font-size: 1rem; line-height: 1; }
 
-/* ---------- Zona de subida de tesis (Inicio) ---------- */
-.drop-zone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  border: 2px dashed var(--accent);
-  border-radius: 12px;
+/* ---------- Resumen de actividad (Inicio) ---------- */
+.resumen {
   background: #fff;
-  padding: 30px 20px;
-  width: 100%;
-  cursor: pointer;
-  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 24px;
 }
-.drop-zone:hover {
-  border-color: var(--accent-dark);
-  background: var(--accent-soft);
-  box-shadow: 0 8px 24px rgba(24, 90, 189, .08);
+.resumen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
-.drop-zone:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
+.resumen-text h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  color: var(--ink);
 }
-.dz-cloud { color: var(--accent); }
-.dz-title { margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: .2px; }
-.dz-sub { margin: 0; font-size: .92rem; color: var(--muted); text-align: center; }
-.dz-badge {
+.resumen-text p {
+  margin: 0;
+  font-size: .88rem;
+  color: var(--muted);
+}
+.resumen-ver {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: .8rem;
-  color: #2e7d5b;
-  background: #e8f5ee;
-  border: 1px solid #b7dfcd;
-  border-radius: 999px;
-  padding: 6px 14px;
-  margin-top: 4px;
+  gap: 4px;
+  font-size: .84rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
 }
-.dz-badge [data-icon] svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+.resumen-ver:hover { text-decoration: underline; }
+.resumen-arrow { font-size: .9rem; }
+
+.resumen-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+.resumen-doc-icon {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  background: #f4f7fb;
+  border: 1px solid #d6e4fa;
+  border-radius: 14px;
+}
+.resumen-doc-ring {
+  position: absolute;
+  inset: 4px;
+  width: auto;
+  height: auto;
+  transform: rotate(-90deg);
+}
+.resumen-doc-ring-fill {
+  transition: stroke-dashoffset .3s ease;
+}
+.resumen-doc-icon [data-icon] {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+}
+.resumen-doc-icon [data-icon] svg { width: 32px; height: 32px; stroke: currentColor; fill: none; }
+
+.resumen-content { flex: 1; min-width: 0; }
+
+.resumen-progreso {
+  margin-bottom: 20px;
+}
+.resumen-detalle { min-width: 0; }
+.resumen-titulo {
+  margin: 0 0 10px;
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.resumen-barra {
+  height: 8px;
+  background: #e8edf3;
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.resumen-barra-lleno {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+.resumen-porcentaje {
+  font-size: .85rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.resumen-estados {
+  display: flex;
+  gap: 12px;
+}
+.resumen-estado {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  align-items: flex-start;
+}
+.resumen-estado-icn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.resumen-estado-icn [data-icon] svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+.resumen-estado-proceso .resumen-estado-icn { background: #e3f2fd; color: #1976d2; }
+.resumen-estado-completada .resumen-estado-icn { background: #e8f5e9; color: #1e7a45; }
+.resumen-estado-pendiente .resumen-estado-icn { background: #fff3e0; color: #b9770e; }
+.resumen-estado .resumen-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.resumen-estado .resumen-label {
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+.resumen-estado-proceso .resumen-num { color: var(--accent); }
+.resumen-estado-completada .resumen-num { color: #1e7a45; }
+.resumen-estado-pendiente .resumen-num { color: #b9770e; }
 
 /* ---------- Estadísticas ---------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
@@ -1603,6 +1708,41 @@ body.reading #page { cursor: default; }
 }
 .tv-st-tab b { font-weight: 800; opacity: .9; font-size: .82rem; }
 
+/* sección Tus documentos */
+.tv-docs-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.tv-docs-icn {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; flex: 0 0 32px;
+  border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+}
+.tv-docs-icn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+.tv-docs-head h2 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--ink); }
+
+/* chips de filtro */
+.tv-chips {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.tv-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: .82rem; cursor: pointer;
+}
+.tv-chip:hover { background: var(--accent-soft); }
+.tv-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.tv-chip b { font-weight: 800; opacity: .9; font-size: .82rem; }
+
 .tv-summary-wrap {
   display: flex;
   align-items: center;
@@ -1660,33 +1800,6 @@ body.reading #page { cursor: default; }
 /* tabla ajustada a nuevas columnas */
 .tv-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .tv-table th { padding: 10px 14px; }
-
-/* botón más acciones */
-.tv-more-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  min-width: 140px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.08);
-  z-index: 10;
-  padding: 6px 0;
-}
-.tv-more-menu[hidden] { display: none; }
-.tv-more-item {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%;
-  padding: 8px 14px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit; font-size: .84rem; cursor: pointer;
-  text-align: left;
-}
-.tv-more-item:hover { background: #f4f7fb; }
-.tv-more-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
 
 @media (max-width: 1080px) {
   .tv-grid { grid-template-columns: 1fr; }
@@ -2019,11 +2132,7 @@ body.reading #page { cursor: default; }
 .rv-table tr:hover td { background: #f7faff; }
 .rv-acc-col { text-align: right; white-space: nowrap; }
 
-/* Filas con borde izquierdo segun severidad */
-.rv-row { border-left: 4px solid transparent; }
-.rv-row.rv-error { border-left-color: var(--error); }
-.rv-row.rv-warning { border-left-color: var(--warning); }
-.rv-row.rv-info { border-left-color: var(--info); }
+
 
 /* Tipo: circulo con el simbolo en blanco + nombre, sobre el tinte del color */
 .rv-tipo { white-space: nowrap; width: 1%; }
@@ -2202,3 +2311,114 @@ body.reading #page { cursor: default; }
 .rv-pages button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
 .rv-pages button:disabled { opacity: .4; cursor: not-allowed; }
 .rv-pg-arrow svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
+/* ============================================================
+   Modal de subida de tesis (Mis tesis) - Drag & Drop
+   ============================================================ */
+.tv-upload-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.tv-upload-modal[hidden] { display: none; }
+.tv-upload-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+}
+.tv-upload-panel {
+  position: relative;
+  z-index: 1;
+  width: min(640px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0,0,0,.16);
+}
+.tv-upload-close {
+  position: absolute;
+  top: 14px; right: 16px;
+  z-index: 2;
+  width: 32px; height: 32px;
+  border: none; border-radius: 8px;
+  background: #f3f5f9; color: var(--ink);
+  font: inherit; font-size: 1.25rem; font-weight: 600;
+  cursor: pointer; display: grid; place-items: center;
+  line-height: 1;
+}
+.tv-upload-close:hover { background: #e5e9ef; }
+
+.tv-upload-dropzone {
+  border: 2px dashed var(--line-strong);
+  border-radius: 14px;
+  background: #fcfcfd;
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.tv-upload-dropzone:hover {
+  border-color: var(--accent);
+  background: #f4f7ff;
+}
+.tv-upload-dropzone.tv-drag-active {
+  border-color: var(--accent);
+  background: #eef3fd;
+  box-shadow: 0 0 0 4px rgba(99, 132, 240, .12);
+}
+
+.tv-upload-icn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 14px;
+  background: #fff; color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  margin: 0 auto 16px;
+}
+.tv-upload-icn svg { width: 30px; height: 30px; stroke: currentColor; fill: none; }
+
+.tv-upload-dropzone h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem; font-weight: 700; color: var(--ink);
+}
+.tv-upload-dropzone p {
+  margin: 0 0 22px;
+  font-size: .94rem; color: var(--muted);
+}
+
+.tv-upload-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff; color: var(--ink);
+  font: inherit; font-size: .94rem; font-weight: 600;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.tv-upload-btn:hover {
+  border-color: var(--accent);
+  background: #f4f7ff;
+  color: var(--accent);
+}
+.tv-upload-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+.tv-upload-badge {
+  margin-top: 20px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #e9f7ef; color: #1e8449;
+  font-size: .84rem; font-weight: 600;
+  border: 1px solid #b7e4c7;
+}
+.tv-upload-badge-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #1e8449; flex: 0 0 8px;
+}

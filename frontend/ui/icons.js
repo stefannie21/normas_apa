@@ -1,4 +1,4 @@
-﻿/* Iconos SVG en linea (sin dependencias externas). */
+/* Iconos SVG en linea (sin dependencias externas). */
 const Icons = (function () {
   "use strict";
   const ICONS = {
@@ -75,6 +75,7 @@ spark: '<path d="M12 2 L13.6 8.2 L20 9.8 L13.6 11.4 L12 18 L10.4 11.4 L4 9.8 L10
     /* etiqueta de regla (Regla APA 7.2) */
     tag: '<path d="M20.6 12.6 12.4 20.8a1.6 1.6 0 0 1-2.3 0L3.4 14a1.6 1.6 0 0 1-.5-1.2V4.6a1.6 1.6 0 0 1 1.6-1.6h8.2c.4 0 .9.2 1.2.5l6.7 6.7a1.6 1.6 0 0 1 0 2.4z"/><circle cx="7.8" cy="7.8" r="1.5"/>',
     error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+    cloudUp: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><path d="M16 12l-4-4 -4 4"/>',
   };
 
   function svg(name) {

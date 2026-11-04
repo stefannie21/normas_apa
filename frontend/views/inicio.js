@@ -16,6 +16,8 @@ import { Library } from "../library.js";
   let app = null;
   // ultimos documentos de la biblioteca, ya ordenados y recortados a tres
   let recientes = [];
+  // la biblioteca completa, sin filtros (es la que se cuenta en el resumen)
+  let biblioteca = [];
   let filtroBuscar = "";
   let filtroEstado = "";
 
@@ -69,6 +71,52 @@ import { Library } from "../library.js";
     );
   }
 
+  // Conteo por estado de TODA la biblioteca, igual que hace "Mis tesis".
+  // Antes solo se miraba el documento abierto, por eso la tarjeta de
+  // "Pendientes" marcaba 0 mientras la lista de abajo mostraba pendientes.
+  function conteoEstados() {
+    const estados = { proceso: 0, completada: 0, pendiente: 0 };
+    const st = s();
+    const c = st.counts || {};
+    const conDoc = !!st.name;
+
+    if (biblioteca.length) {
+      biblioteca.forEach((r) => {
+        const e = Library.LABEL[r.status] ? r.status : "pendiente";
+        if (estados[e] != null) estados[e]++;
+      });
+    }
+
+    // El documento abierto cuenta aunque todavia no este en la biblioteca
+    // (aun no ha responden IndexedDB).
+    if (conDoc && !biblioteca.some((r) => r.name === st.name)) {
+      const e = st.score == null ? "pendiente" : (c.error ? "proceso" : "completada");
+      if (estados[e] != null) estados[e]++;
+    }
+
+    const total = biblioteca.length || (conDoc ? 1 : 0);
+    const pct = total
+      ? Math.round(((estados.completada + estados.proceso * 0.5) / total) * 100)
+      : 0;
+    return { c: estados, pct };
+  }
+
+  // Vuelca el conteo en el DOM. Se llama aparte porque los datos de la
+  // biblioteca llegan despues del primer pintado.
+  function pintarContadores() {
+    const { c: estados, pct } = conteoEstados();
+    const anillo = document.getElementById("resumen-ring-fill");
+    if (anillo) anillo.style.strokeDashoffset = String(60 * (1 - pct / 100));
+    const barra = document.getElementById("resumen-barra-lleno");
+    if (barra) barra.style.width = pct + "%";
+    const pctEl = document.getElementById("resumen-porcentaje");
+    if (pctEl) pctEl.textContent = pct + "%";
+    ["proceso", "completada", "pendiente"].forEach((k) => {
+      const el = document.getElementById("resumen-num-" + k);
+      if (el) el.textContent = String(estados[k]);
+    });
+  }
+
   function render() {
     const st = s();
     const c = st.counts || {};
@@ -82,23 +130,7 @@ import { Library } from "../library.js";
     const avisa = conDoc ? (analizado ? c.warning || 0 : "—") : "—";
     const total = conDoc ? (analizado ? c.all || 0 : "—") : "—";
 
-    // sin dato no hay nada que ver: el enlace se oculta en vez de llevar a una
-    // pantalla vacia
-    const stat = (tone, ico, num, label, enlace) => {
-      let extra = "";
-      if (label === "Cumplimiento" && conDoc && analizado) {
-        const pct = Math.max(0, Math.min(100, Number(st.score) || 0));
-        extra = `<div class="stat-bar"><div class="stat-bar-fill" style="width:${pct}%"></div></div>`;
-      }
-      return `
-      <div class="stat ${tone}${num === "—" ? " vacio" : ""}">
-        <span class="stat-icn">${icon(ico)}</span>
-        <span class="stat-num">${esc(num)}</span>
-        <span class="stat-label">${esc(label)}</span>
-        ${extra}
-        ${enlace && num !== "—" ? `<button class="stat-link" data-go="${enlace}">${esc(enlace === "pane" ? "Ver informe" : "Ver en el editor")}</button>` : ""}
-      </div>`;
-    };
+    const { c: estados, pct } = conteoEstados();
 
     // la lista se rellena al momento con el documento abierto y, en cuanto la
     // biblioteca responde, se cambia por los tres ultimos documentos
@@ -119,23 +151,51 @@ import { Library } from "../library.js";
             </div>
           </section>
 
-          <div class="drop-zone" data-act="open" role="button" tabindex="0">
-            <div class="dz-cloud">
-              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12a5 5 0 0 1 5-5h2a2 2 0 0 1 2 2v2a5 5 0 0 1 5 5v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
-                <path d="M12 14V8M12 8l-3 3M12 8l3 3"/>
-              </svg>
+          <section class="resumen">
+            <div class="resumen-head">
+              <div class="resumen-text">
+                <h2>Resumen de tu actividad</h2>
+                <p>Últimos movimientos y progreso de tus tesis.</p>
+              </div>
+              <a class="resumen-ver" href="#" data-act="ver-todas">Ver todas <span class="resumen-arrow">→</span></a>
             </div>
-            <h2 class="dz-title">Arrastra aquí tu tesis .docx</h2>
-            <p class="dz-sub">o haz clic para explorar en tu computadora</p>
-            <span class="dz-badge">${icon("shield")} Cifrado de extremo a extremo · Ningún texto es publicado</span>
-          </div>
-
-          <section class="stats">
-            ${stat("", "chart", val(st.score != null ? st.score + " %" : "—"), "Cumplimiento", "pane")}
-            ${stat("error", "search", error, "Errores", "correcciones")}
-            ${stat("warning", "clipboard", avisa, "Avisos", "correcciones")}
-            ${stat("", "docs", total, "Hallazgos en total", "pane")}
+            <div class="resumen-body">
+              <div class="resumen-doc-icon">
+                  <svg class="resumen-doc-ring" viewBox="0 0 24 24">
+                    <circle class="resumen-doc-ring-bg" cx="12" cy="12" r="9.5" fill="none" stroke="#e8edf3" stroke-width="2" stroke-linecap="round"/>
+                    <circle class="resumen-doc-ring-fill" id="resumen-ring-fill" cx="12" cy="12" r="9.5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-dasharray="60" style="stroke-dashoffset:${60 * (1 - pct / 100)}"/>
+                  </svg>
+                  ${icon("docs")}
+                </div>
+              <div class="resumen-content">
+                <div class="resumen-progreso">
+                  <div class="resumen-detalle">
+                    <div class="resumen-titulo">Progreso general de tus tesis</div>
+                    <div class="resumen-barra">
+                      <div class="resumen-barra-lleno" id="resumen-barra-lleno" style="width:${pct}%"></div>
+                    </div>
+                    <span class="resumen-porcentaje" id="resumen-porcentaje">${pct}%</span>
+                  </div>
+                </div>
+                <div class="resumen-estados">
+                  <div class="resumen-estado resumen-estado-proceso">
+                    <div class="resumen-estado-icn">${icon("clock")}</div>
+                    <div class="resumen-num" id="resumen-num-proceso">${estados.proceso}</div>
+                    <div class="resumen-label">Tesis en proceso</div>
+                  </div>
+                  <div class="resumen-estado resumen-estado-completada">
+                    <div class="resumen-estado-icn">${icon("fix")}</div>
+                    <div class="resumen-num" id="resumen-num-completada">${estados.completada}</div>
+                    <div class="resumen-label">Completada</div>
+                  </div>
+                  <div class="resumen-estado resumen-estado-pendiente">
+                    <div class="resumen-estado-icn">${icon("pending")}</div>
+                    <div class="resumen-num" id="resumen-num-pendiente">${estados.pendiente}</div>
+                    <div class="resumen-label">Pendientes</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="card">
@@ -157,17 +217,103 @@ import { Library } from "../library.js";
             <ul class="recientes" id="dash-recientes">${documento}</ul>
           </section>
         </div>
-      </div>`;
+      </div>
+
+      <!-- Modal de subida de tesis (drag & drop) -->
+      <div class="tv-upload-modal" id="tv-upload-modal" hidden>
+        <div class="tv-upload-backdrop"></div>
+        <div class="tv-upload-panel">
+          <button class="tv-upload-close" id="tv-upload-close">&times;</button>
+          <div class="tv-upload-dropzone" id="tv-upload-dropzone">
+            <span class="tv-upload-icn" data-icon="cloudUp"></span>
+            <h2>Arrastra aqu\u00ed tu tesis .docx</h2>
+            <p>o haz clic para explorar en tu computadora</p>
+            <button class="tv-upload-btn" id="tv-upload-btn">Seleccionar archivo .docx</button>
+            <p class="tv-upload-badge">
+              <span class="tv-upload-badge-dot"></span>
+              Cifrado de extremo a extremo \u00b7 Ning\u00fan texto es publicado
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>`;
   }
 
   /* ---------- Acciones del panel ---------- */
   function mount(el) {
     root = el;
-    root.querySelectorAll("[data-act]").forEach((b) => {
-      b.addEventListener("click", () => {
-        if (b.dataset.act === "open" && app.pickFile) app.pickFile();
+
+    // "Ver todas" lleva a Mis tesis, que es la vista con la biblioteca
+    // completa y los filtros por estado.
+    const verTodas = root.querySelector("[data-act='ver-todas']");
+    if (verTodas) {
+      verTodas.addEventListener("click", (e) => {
+        e.preventDefault();
+        Router.go("tesis");
+      });
+    }
+
+    // El boton "Abrir tesis .docx" abre el modal de drag & drop.
+    root.querySelectorAll("[data-act='open']").forEach((b) => {
+      b.addEventListener("click", (e) => {
+        if (b.classList.contains("hero-btn")) {
+          const modal = document.getElementById("tv-upload-modal");
+          if (modal) modal.hidden = false;
+          return;
+        }
+        if (b.dataset.act === "open" && app.pickFile) {
+          const fileInput = document.getElementById("file");
+          const onPicked = () => {
+            fileInput.removeEventListener("change", onPicked);
+            Router.go("correcciones");
+          };
+          fileInput.addEventListener("change", onPicked, { once: true });
+          app.pickFile();
+        }
       });
     });
+
+    /* ---------- Modal de subida de tesis ---------- */
+    const modal = document.getElementById("tv-upload-modal");
+    const backdrop = document.getElementById("tv-upload-backdrop");
+    const closeBtn = document.getElementById("tv-upload-close");
+    const dropzone = document.getElementById("tv-upload-dropzone");
+    const uploadBtn = document.getElementById("tv-upload-btn");
+
+    function cerrarModal() { if (modal) modal.hidden = true; }
+
+    if (closeBtn) closeBtn.addEventListener("click", cerrarModal);
+    if (backdrop) backdrop.addEventListener("click", cerrarModal);
+
+    // Abrir explorador y cerrar modal
+    function subirArchivo() {
+      cerrarModal();
+      if (app && app.pickFile) app.pickFile();
+    }
+
+    // Al hacer clic en el area de drop o en el boton, abrir el explorador
+    if (dropzone) dropzone.addEventListener("click", (e) => {
+      if (e.target.closest("#tv-upload-close")) return;
+      subirArchivo();
+    });
+    if (uploadBtn) uploadBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      subirArchivo();
+    });
+
+    // Drag & drop visual: resaltar al arrastrar, abrir explorador al soltar
+    if (dropzone) {
+      ["dragenter","dragover"].forEach(ev => dropzone.addEventListener(ev, (e) => {
+        e.preventDefault(); dropzone.classList.add("tv-drag-active");
+      }));
+      ["dragleave","drop"].forEach(ev => dropzone.addEventListener(ev, (e) => {
+        e.preventDefault(); dropzone.classList.remove("tv-drag-active");
+      }));
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        subirArchivo();
+      });
+    }
 
     root.querySelectorAll("[data-go]").forEach((b) => {
       b.addEventListener("click", () => {
@@ -240,9 +386,9 @@ import { Library } from "../library.js";
     Router.go("correcciones");
   }
 
-  // Los tres documentos mas recientes de la biblioteca. Manda la fecha del
-  // ultimo analisis (los "que se revisaron"); si nunca se reviso, la de cuando
-  // se abrio.
+  // La biblioteca completa, sin filtros. Los contadores del resumen se
+  // cuentan sobre esta, no sobre la vista filtrada, para que buscar o
+  // filtrar no cambie los numeros.
   async function cargarRecientes() {
     const lista = document.getElementById("dash-recientes");
     if (!lista) return;
@@ -252,11 +398,16 @@ import { Library } from "../library.js";
     } catch (e) {
       return; // si la biblioteca falla se queda lo que ya estaba pintado
     }
-    if (!docs.length) return;
+    biblioteca = docs || [];
+    if (!biblioteca.length) {
+      recientes = [];
+      pintarContadores();
+      return;
+    }
 
     const cuando = (r) => String(r.analyzedAt || r.addedAt || "");
     const fb = (filtroBuscar || "").toLowerCase();
-    recientes = docs
+    recientes = biblioteca
       .filter((r) => {
         const texto = String(r.title || r.name || "").toLowerCase();
         if (fb && !texto.includes(fb)) return false;
@@ -267,6 +418,9 @@ import { Library } from "../library.js";
     const st = s();
     lista.innerHTML = recientes.map((r) => filaDoc(r, st)).join("");
     Dom.hydrate(lista);
+    // la biblioteca ya respondio: los contadores de "Resumen de tu actividad"
+    // tienen que reflejar el total real, no solo el documento abierto
+    pintarContadores();
   }
 
   // el editor avisa cuando cambia el estado (abrir, verificar, corregir) para

@@ -16,21 +16,10 @@ let rows = [];
 let tabActual = "";
 
 function filtradas() {
-  const q = (document.getElementById("tv-q").value || "").trim().toLowerCase();
-  const estado = document.getElementById("tv-estado").value;
-  const orden = document.getElementById("tv-orden").value;
-
   let out = rows.slice();
   if (tabActual) out = out.filter((r) => r.status === tabActual);
-  if (estado) out = out.filter((r) => r.status === estado);
-  if (q) out = out.filter((r) => Library.searchText(r).includes(q));
-
   const porFecha = (a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || ""));
-  if (orden === "antiguos") out.reverse();
-  else if (orden === "titulo") out.sort((a, b) => a.title.localeCompare(b.title));
-  else if (orden === "cumplimiento")
-    out.sort((a, b) => (b.score == null ? -1 : b.score) - (a.score == null ? -1 : a.score));
-  else out.sort(porFecha);
+  out.sort(porFecha);
   return out;
 }
 
@@ -102,36 +91,17 @@ function render() {
 
       <div class="tv-grid">
         <div class="tv-main">
-          <div class="tv-toolbar">
-            <div class="tv-status-tabs">
-              <button class="tv-st-tab${tabActual === "" ? " active" : ""}" data-tv-tab="">Todas <b>${total}</b></button>
-              <button class="tv-st-tab${tabActual === "proceso" ? " active" : ""}" data-tv-tab="proceso">En proceso <b>${c.proceso}</b></button>
-              <button class="tv-st-tab${tabActual === "completada" ? " active" : ""}" data-tv-tab="completada">Completadas <b>${c.completada}</b></button>
-              <button class="tv-st-tab${tabActual === "pendiente" ? " active" : ""}" data-tv-tab="pendiente">Pendientes <b>${c.pendiente}</b></button>
+          <div class="tv-docs-head">
+            <span class="tv-docs-icn">${icon("docs")}</span>
+            <div>
+              <h2>Tus documentos</h2>
             </div>
-            <div class="tv-search">
-              ${icon("search")}
-              <input type="search" id="tv-q" placeholder="Buscar por título, autor o código..." aria-label="Buscar tesis">
-            </div>
-            <label class="tv-select">
-              <span>Estado</span>
-              <select id="tv-estado" aria-label="Filtrar por estado">
-                <option value="">Todos</option>
-                <option value="completada">Completada</option>
-                <option value="proceso">En proceso</option>
-                <option value="pendiente">Pendiente</option>
-              </select>
-            </label>
-            <label class="tv-select">
-              <span>Fecha</span>
-              <select id="tv-orden" aria-label="Ordenar por">
-                <option value="recientes">Más recientes</option>
-                <option value="antiguos">Más antiguas</option>
-                <option value="titulo">Título (A-Z)</option>
-                <option value="cumplimiento">Cumplimiento</option>
-              </select>
-            </label>
-            <button class="tv-btn-filtros" title="Filtrados">${icon("filter")} Filtrados</button>
+          </div>
+          <div class="tv-chips">
+            <button class="tv-chip${tabActual === "" ? " active" : ""}" data-tv-chip="">Todas <b>${total}</b></button>
+            <button class="tv-chip${tabActual === "proceso" ? " active" : ""}" data-tv-chip="proceso">En proceso <b>${c.proceso}</b></button>
+            <button class="tv-chip${tabActual === "completada" ? " active" : ""}" data-tv-chip="completada">Completadas <b>${c.completada}</b></button>
+            <button class="tv-chip${tabActual === "pendiente" ? " active" : ""}" data-tv-chip="pendiente">Pendientes <b>${c.pendiente}</b></button>
           </div>
 
           <div class="tv-tablewrap">
@@ -172,17 +142,6 @@ function render() {
 
           <div class="tv-card">
             <div class="tv-card-head">
-              <span class="tv-card-icn">${icon("clock")}</span>
-              <div>
-                <h2>Actividad reciente</h2>
-                <a class="tv-ver-todas" href="#">Ver todas &rarr;</a>
-              </div>
-            </div>
-            <div class="tv-activity" id="tv-activity"></div>
-          </div>
-
-          <div class="tv-card">
-            <div class="tv-card-head">
               <span class="tv-card-icn">${icon("idea")}</span>
               <div>
                 <h2>Consejo</h2>
@@ -219,7 +178,7 @@ function pintarTabla() {
         <td class="tv-row-acc">
           <button data-tv-row="open" title="Abrir esta tesis">${Icons.svg("eye", 16)}</button>
           <button data-tv-row="download" title="Descargar el archivo original">${Icons.svg("save", 16)}</button>
-          <button data-tv-row="more" title="Más acciones">${Icons.svg("more", 16)}</button>
+          <button class="danger" data-tv-row="delete" title="Eliminar esta tesis" aria-label="Eliminar ${esc(r.title)}">${Icons.svg("trash", 16)}</button>
         </td>
       </tr>`;
     })
@@ -259,22 +218,6 @@ function pintarTabla() {
       : "conic-gradient(#e3e7ed 0 100%)";
   }
 
-  // actividad reciente: las 3 tesis mas recientes
-  const activity = document.getElementById("tv-activity");
-  if (activity) {
-    const recientes = [...rows].sort((a, b) => String(b.addedAt || "").localeCompare(String(a.addedAt || ""))).slice(0, 3);
-    activity.innerHTML = recientes.map((r) => {
-      const estadoClass = "tv-act-" + (r.status || "pendiente");
-      return `<div class="tv-act-item">
-        <span class="tv-act-icn">${icon("docs")}</span>
-        <div class="tv-act-info">
-          <div class="tv-act-titulo">${esc(r.title)}</div>
-          <div class="tv-act-meta">${esc(Library.LABEL[r.status] || "Pendiente")} · ${esc(Library.stamp(r.addedAt))}</div>
-        </div>
-        <span class="tv-act-dot ${estadoClass}"></span>
-      </div>`;
-    }).join("");
-  }
 }
 
 async function cargar() {
@@ -286,21 +229,15 @@ async function cargar() {
 function mount(el) {
   root = el;
 
-  const tabs = el.querySelector(".tv-status-tabs");
-  if (tabs) {
-    tabs.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-tv-st-tab]");
+  const chips = el.querySelector(".tv-chips");
+  if (chips) {
+    chips.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tv-chip]");
       if (!b) return;
-      tabActual = b.dataset.tvStTab || "";
+      tabActual = b.dataset.tvChip || "";
       pintarTodo();
     });
   }
-
-  ["tv-q", "tv-estado", "tv-orden"].forEach((id) => {
-    const campo = document.getElementById(id);
-    if (!campo) return;
-    campo.addEventListener(campo.tagName === "INPUT" ? "input" : "change", pintarTabla);
-  });
 
   const body = document.getElementById("tv-body");
   if (body) {
@@ -325,13 +262,12 @@ function mount(el) {
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 2000);
-      } else if (btn.dataset.tvRow === "more") {
-        const menu = btn.closest("tr").querySelector(".tv-more-menu");
-        document.querySelectorAll(".tv-more-menu").forEach((m) => m.hidden = true);
-        if (menu) menu.hidden = !menu.hidden;
       } else if (btn.dataset.tvRow === "delete") {
+        if (!window.confirm('¿Eliminar "' + (rec.title || rec.name) + '" de la biblioteca? Esta acción no se puede deshacer.')) return;
         await Library.remove(id);
         await cargar();
+        // si la tesis eliminada era la que estaba abierta, el editor conserva
+        // el documento en pantalla pero ya no figura en la biblioteca
         if (app && app.toast) app.toast("Tesis eliminada de la biblioteca", "ok");
       }
     });

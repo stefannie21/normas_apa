@@ -3,10 +3,11 @@
    El informe deja de ser un panel pegado al documento: se pinta aqui a pantalla
    completa. Los datos salen del editor (app.report()), que es quien analiza; la
    vista no calcula nada por su cuenta salvo el filtro por gravedad, el filtro
-   por categoria, la busqueda y la paginacion.
+   por categoria y la paginacion.
 */
 import { Router } from "../core/router.js";
 import { Dom } from "../core/dom.js";
+import { Icons } from "../ui/icons.js";
 
 const { esc, icon } = Dom;
 
@@ -22,7 +23,6 @@ let root = null;
 let app = null;
 let filtro = "all";
 let categoria = "";
-let busqueda = "";
 let pagina = 1;
 
 function estado() {
@@ -36,31 +36,11 @@ function contar(list) {
   return c;
 }
 
-function sinTildes(texto) {
-  return String(texto || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function coincide(f, texto) {
-  if (!texto) return true;
-  const t = sinTildes(texto);
-  return (
-    sinTildes(f.message).includes(t) ||
-    sinTildes(f.category).includes(t) ||
-    sinTildes(f.location).includes(t) ||
-    sinTildes(f.rule_id).includes(t) ||
-    sinTildes(f.suggestion).includes(t)
-  );
-}
-
 function visibles(lista) {
   return lista.filter(
     (f) =>
       (filtro === "all" || f.severity === filtro) &&
-      (!categoria || f.category === categoria) &&
-      coincide(f, busqueda)
+      (!categoria || f.category === categoria)
   );
 }
 
@@ -91,10 +71,10 @@ function paginacion(total, actual) {
     .join("");
   return `<div class="rv-pages">
       <button data-pag="${actual - 1}" class="rv-pg-arrow" ${actual <= 1 ? "disabled" : ""}
-        aria-label="Pagina anterior">&#10094;</button>
+        aria-label="Pagina anterior">Anterior</button>
       ${botones}
       <button data-pag="${actual + 1}" class="rv-pg-arrow next" ${actual >= total ? "disabled" : ""}
-        aria-label="Pagina siguiente">&#10095;</button>
+        aria-label="Pagina siguiente">Siguiente</button>
     </div>`;
 }
 
@@ -102,7 +82,7 @@ function paginacion(total, actual) {
 function sevChip(sev) {
   const k = SEV_TEXT[sev] ? sev : "info";
   return `<span class="rv-sev-chip rv-sev-${k}">
-      <span class="rv-sev-ico">${icon(SEV_ICON[k])}</span>${esc(SEV_TEXT[k])}
+      <span class="rv-sev-ico">${k === "info" ? "¡" : Icons.svg(SEV_ICON[k])}</span>${esc(SEV_TEXT[k])}
     </span>`;
 }
 
@@ -147,9 +127,6 @@ function filaHallazgo(f, indice) {
       <td class="rv-ubi">
         <div class="rv-ubi-texto">${esc(ubic.principal)}</div>
         ${ubic.secundario ? `<div class="rv-ubi-sec">${esc(ubic.secundario)}</div>` : ""}
-      </td>
-      <td class="rv-prio">
-        <span class="rv-prio-chip rv-prio-${sev}">${SEV_PRIO[sev]}</span>
       </td>
       <td class="rv-acc">
         <button class="rv-iconbtn" data-act="ver" data-i="${indice}" title="Ver en el documento">${icon("eye")}</button>
@@ -232,10 +209,10 @@ function render() {
     .join("");
 
   const cuerpo = !st.ready
-    ? `<tr><td colspan="5" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
+    ? `<tr><td colspan="4" class="rv-vacio">Aún no se ha verificado el documento.</td></tr>`
     : enPagina.length
       ? enPagina.map((f) => filaHallazgo(f, lista.indexOf(f))).join("")
-      : `<tr><td colspan="5" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
+      : `<tr><td colspan="4" class="rv-vacio">Sin hallazgos con estos filtros.</td></tr>`;
 
   const inicioRango = filtrada.length ? desde + 1 : 0;
   const finRango = Math.min(desde + POR_PAGINA, filtrada.length);
@@ -284,7 +261,7 @@ function render() {
           "editor"
         )}
         ${tarjeta("info",
-          icon("info"),
+          "¡",
           cuentas.info || 0,
           "Observaciones",
           "Ver en el editor",
@@ -304,28 +281,18 @@ function render() {
         <div class="rv-header-chips">${chips}</div>
         <button class="pane-dl" data-act="descargar" ${st.hasFile ? "" : "disabled"}
           title="Descargar el informe APA en un documento Word (.docx)"
-          aria-label="Descargar el informe APA en Word">${icon("download")} Descargar informe</button>
+          aria-label="Descargar el informe APA en Word">Descargar informe</button>
       </div>
 
       <!-- Barra de filtros -->
       <div class="rv-toolbar">
-        <div class="rv-search-wrap">
-          <span class="rv-search-icn">${icon("search")}</span>
-          <input class="rv-search" type="search" placeholder="Buscar por regla, texto o referencia..."
-            value="${esc(busqueda)}" aria-label="Buscar en los hallazgos" />
-        </div>
         <select id="rv-tipo" class="rv-sel" required aria-label="Tipo de hallazgo">
           <option value="" ${filtro === "all" ? "selected" : ""}>Tipo de hallazgo</option>
           <option value="error" ${filtro === "error" ? "selected" : ""}>Error</option>
           <option value="warning" ${filtro === "warning" ? "selected" : ""}>Aviso</option>
           <option value="info" ${filtro === "info" ? "selected" : ""}>Observacion</option>
         </select>
-        <select id="rv-prioridad" class="rv-sel" required aria-label="Prioridad">
-          <option value="" ${filtro === "all" ? "selected" : ""}>Prioridad</option>
-          <option value="error" ${filtro === "error" ? "selected" : ""}>Alta</option>
-          <option value="warning" ${filtro === "warning" ? "selected" : ""}>Media</option>
-          <option value="info" ${filtro === "info" ? "selected" : ""}>Baja</option>
-        </select>
+
         <button class="rv-btn-limpiar" data-act="limpiar">${icon("filter")} Limpiar filtros</button>
       </div>
 
@@ -337,7 +304,6 @@ function render() {
               <th scope="col">Tipo</th>
               <th scope="col">Descripción del hallazgo</th>
               <th scope="col">Ubicación</th>
-              <th scope="col">Prioridad</th>
               <th scope="col" class="rv-acc-col">Acciones</th>
             </tr>
           </thead>
@@ -360,16 +326,6 @@ function mount(el) {
     })
   );
 
-  // Buscador
-  const busquedaEl = el.querySelector(".rv-search");
-  if (busquedaEl) {
-    busquedaEl.addEventListener("input", (e) => {
-      busqueda = e.target.value;
-      pagina = 1;
-      pintar();
-    });
-  }
-
   // Filtro tipo de hallazgo
   const tipoEl = el.querySelector("#rv-tipo");
   if (tipoEl) {
@@ -380,28 +336,14 @@ function mount(el) {
     });
   }
 
-  // Filtro prioridad (mapea a severidad)
-  const prioEl = el.querySelector("#rv-prioridad");
-  if (prioEl) {
-    prioEl.addEventListener("change", (e) => {
-      const v = e.target.value;
-      filtro = v || "all";
-      pagina = 1;
-      pintar();
-    });
-  }
+
 
   // Limpiar filtros
   el.querySelectorAll("[data-act=limpiar]").forEach((b) =>
     b.addEventListener("click", () => {
       filtro = "all";
-      busqueda = "";
-      const inp = el.querySelector(".rv-search");
-      if (inp) inp.value = "";
       const t = el.querySelector("#rv-tipo");
       if (t) t.value = "";
-      const p = el.querySelector("#rv-prioridad");
-      if (p) p.value = "";
       pagina = 1;
       pintar();
     })
@@ -478,23 +420,9 @@ function pintar() {
   if (!root) return;
   const vista = document.getElementById("view");
   const scroll = vista ? vista.scrollTop : 0;
-  const activo = document.activeElement;
-  const enBusqueda = activo && activo.classList && activo.classList.contains("rv-search");
-  const pos = enBusqueda ? activo.selectionStart : null;
   root.innerHTML = render();
   Dom.hydrate(root);
   mount(root);
-  if (enBusqueda) {
-    const inp = root.querySelector(".rv-search");
-    if (inp) {
-      inp.focus();
-      try {
-        inp.setSelectionRange(pos, pos);
-      } catch (e) {
-        /* algunos navegadores no lo permiten con type=search */
-      }
-    }
-  }
   if (vista) vista.scrollTop = scroll;
 }
 
@@ -513,3 +441,4 @@ Router.register("reportes", {
     app = api;
   },
 });
+
