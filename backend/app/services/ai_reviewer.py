@@ -114,7 +114,12 @@ SYSTEM_PROMPT = (
     "cita incumple esto, inclúyelo en 'missing'. "
     "No inventes datos que no estén en la entrada. Responde SOLO con un arreglo JSON "
     "de objetos con las claves: index, type, missing (arreglo de cadenas), "
-    "suggestion, confidence. Sin texto fuera del JSON."
+      "suggestion, confidence. Sin texto fuera del JSON. "
+      "REGLA ESTRICTA DE VERIFICACION: analiza UNICAMENTE las citas y referencias que "
+      "aparecen explicitamente en el JSON que recibes. No inventes autores, no traigas "
+      "informacion de otros contextos. Antes de reportar un elemento ausente o una "
+      "discrepancia para una cita, verifica que el apellido del autor aparezca textualmente "
+      "en esa cita. Si el apellido no esta en el texto, no crees la observacion."
 )
 
 
