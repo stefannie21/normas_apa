@@ -33,6 +33,9 @@ SYSTEM_PROMPT = """Eres un asistente de IA experto en redaccion academica bajo n
 
 CRITERIOS DE EXCLUSION ESTRICTOS (Falsos Positivos comunes):
 
+0. VERIFICACION TEXTUAL OBLIGATORIA:
+Antes de clasificar o crear cualquier observacion sobre una cita o referencia, verifica que el apellido del autor aparece textualmente en el fragmento evaluado. No inventes autores, no traigas informacion de otros contextos. Si el apellido no esta en el texto, descarta la observacion (dismiss) con motivo "apellido no presente en el texto".
+
 1. PORTADA Y DATOS INSTITUCIONALES:
 Cualquier hallazgo de tipo HEAD (titulos sin estilo) o FORMAT (tamano de fuente fuera de rango, ej. 14pt, 16pt, 18pt) que ocurra en la primera pagina o portada (nombres de universidades, facultades, titulos de tesis, la palabra "Autor") debe clasificarse obligatoriamente como "dismiss".
 

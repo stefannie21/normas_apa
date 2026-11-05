@@ -1,20 +1,39 @@
 from __future__ import annotations
 
+import re
+
 from backend.app.rules.base import Category, Finding, Rule, Severity
 from backend.app.services.docx_parser import ParsedDocument
 
-# APA 7: 2.54 cm (1 in) en todos los margenes.
+# APA 7: 1 in (2.54 cm) en los cuatro margenes.
+# https://apastyle.apa.org/style-grammar-guidelines/paper-format/margins
 MARGIN_IN = 1.0
-MARGIN_TOLERANCE_IN = 0.1
+MARGIN_TOLERANCE_IN = 0.05  # Tolerancia técnica estricta: 0.95 a 1.05 in (±1.27 mm por redondeo twips)
 
-ACCEPTED_FONTS = {
-    "times new roman",
-    "calibri",
-    "arial",
-    "georgia",
-    "lucida sans unicode",
-    "computer modern",
+# La pagina oficial de tipografia NO impone una lista cerrada: "A variety of
+# fonts are permitted in APA Style papers, including the default font of your
+# word-processing program". Estas son las fuentes RECOMENDADAS (incluye Aptos,
+# que falto en la version anterior del motor). No se usan para generar errores.
+RECOMMENDED_FONTS = {
+    "aptos",                    # 12 pt, sans serif (pagina oficial)
+    "times new roman",          # 12 pt, serif
+    "calibri",                  # 11 pt
+    "arial",                    # 11 pt
+    "georgia",                  # 11 pt
+    "lucida sans unicode",      # 10 pt
+    "computer modern",          # 10 pt (LaTeX)
 }
+# Compatibilidad con el nombre anterior del modulo (no se usa para validar).
+ACCEPTED_FONTS = set(RECOMMENDED_FONTS)
+
+# Excepcion oficial: las fuentes monoespaciadas se reservan para CODIGO; las
+# sans serif de 8-14 pt para el interior de imagenes de figuras; los pies de
+# pagina conservan el ajuste por defecto del procesador.
+MONOSPACE_FONTS = {
+    "courier new", "lucida console", "consolas", "monaco", "menlo",
+    "source code pro", "courier", "monospace",
+}
+SYMBOL_FONTS = {"wingdings", "webdings", "symbol", "zapf dingbats"}
 
 ACCEPTED_SIZES = {10.0, 11.0, 12.0}
 
@@ -24,9 +43,46 @@ INDENT_TOLERANCE_IN = 0.1
 LINE_SPACING_TARGET = 2.0
 LINE_SPACING_TOLERANCE = 0.15
 
+FONT_URL = "https://apastyle.apa.org/style-grammar-guidelines/paper-format/font"
+MARGINS_URL = "https://apastyle.apa.org/style-grammar-guidelines/paper-format/margins"
+
 
 def _approx(value, target, tol) -> bool:
     return value is not None and abs(value - target) <= tol
+
+
+def _is_landscape(section) -> bool:
+    """Seccion apaisada: excepcion oficial para tablas anchas."""
+    w, h = section.page_width_in, section.page_height_in
+    return w is not None and h is not None and w > h
+
+
+def _is_binding_margin(section) -> bool:
+    """Margen izquierdo ampliado para encuadernacion de tesis/doctorado.
+
+    Fuente oficial: 'if you are writing a dissertation or thesis, your advisor
+    or institution may specify different margins (e.g., a 1.5-inch left margin
+    to accommodate binding)'. No es un incumplimiento.
+    """
+    left = section.left_margin_in
+    if left is None or not (1.4 <= left <= 1.8):
+        return False
+    others = (
+        section.top_margin_in,
+        section.bottom_margin_in,
+        section.right_margin_in,
+    )
+    return all(v is None or _approx(v, MARGIN_IN, MARGIN_TOLERANCE_IN) for v in others)
+
+
+def _excluded(document: ParsedDocument, p) -> bool:
+    """Zonas con excepcion de formato: portada y bloques de imagen."""
+    if getattr(p, "has_image", False):
+        return True
+    try:
+        return bool(document.is_cover_paragraph(p))
+    except Exception:
+        return False
 
 
 class MarginRule(Rule):
@@ -37,11 +93,20 @@ class MarginRule(Rule):
             category=Category.FORMATO,
             description="Todos los márgenes de la página deben ser de 1 pulgada (2.54 cm).",
             default_severity=Severity.ERROR,
+            norm_source=MARGINS_URL,
+            exceptions=(
+                "Tesis/doctorado con margen izquierdo de 1.5 in para encuadernación "
+                "(la propia página oficial lo contempla); secciones apaisadas "
+                "para tablas anchas."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
         findings: list[Finding] = []
         for section in document.sections:
+            # Excepciones documentadas: no se genera observacion.
+            if _is_landscape(section) or _is_binding_margin(section):
+                continue
             wrong = []
             for label, value in (
                 ("superior", section.top_margin_in),
@@ -58,38 +123,116 @@ class MarginRule(Rule):
                         f"La sección {section.index + 1} no tiene márgenes APA (1 in). "
                         f"Valores detectados: {', '.join(wrong)}.",
                         location=f"Sección {section.index + 1}",
-                        suggestion="Configurar 2.54 cm (1 in) en los cuatro márgenes.",
+                        suggestion=(
+                            "Configurar 2.54 cm (1 in) en los cuatro márgenes. Si la "
+                            "institución exige 1.5 in a la izquierda para encuadernar "
+                            "una tesis, esa excepción es válida en APA 7."
+                        ),
+                        extra={
+                            "evidence_kind": "document_property",
+                            "property": f"márgenes de la sección {section.index + 1}: {', '.join(wrong)}",
+                            "section_index": section.index,
+                            "margins": {
+                                "top": section.top_margin_in,
+                                "bottom": section.bottom_margin_in,
+                                "left": section.left_margin_in,
+                                "right": section.right_margin_in,
+                            },
+                        },
                     )
                 )
         return findings
 
 
 class FontFamilyRule(Rule):
+    """Consistencia de tipografia, NO lista cerrada de fuentes permitidas.
+
+    La version anterior marcaba como error cualquier fuente que no estuviera en
+    una lista de seis nombres. La pagina oficial permite 'a variety of fonts
+    ... including the default font of your word-processing program', de modo
+    que aquello generaba falsos positivos. Lo que SI exige la norma es usar la
+    misma fuente en todo el trabajo, con excepciones explicitas para codigo,
+    figuras y notas al pie.
+    """
+
     def __init__(self) -> None:
         super().__init__(
             id="FORMAT-002",
-            name="Tipografía permitida",
+            name="Consistencia de tipografía",
             category=Category.FORMATO,
-            description="Usar una fuente aceptada por APA (p. ej. Times New Roman 12, Calibri 11, Arial 11).",
+            description=(
+                "APA 7 permite una variedad de fuentes legibles, pero exige usar "
+                "la misma en todo el documento; las monoespaciadas se reservan "
+                "para código informático."
+            ),
+            norm_source=FONT_URL,
+            exceptions=(
+                "Monoespaciada (Courier New, Lucida Console...) solo para código; "
+                "sans serif 8-14 pt dentro de imágenes de figuras; notas al pie "
+                "con la fuente por defecto del procesador."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
-        seen: dict[str, object] = {}
-        for p in document.body_paragraphs:
-            for name in p.fonts:
-                key = name.strip().lower()
-                if key and key not in ACCEPTED_FONTS and key not in seen:
-                    seen[key] = p
-        return [
-            self.finding(
-                f"Fuente no recomendada por APA: '{name}'.",
-                paragraph_index=p.index,
-                location=f"Párrafo {p.index + 1}",
-                excerpt=p.excerpt(),
-                suggestion="Usar Times New Roman 12, Calibri 11, Arial 11, Georgia 11, Lucida Sans Unicode 10 o Computer Modern 10.",
+        default = (document.default_font or "").strip().lower()
+        findings: list[Finding] = []
+
+        # Un estilo Normal monoespaciado/simbolico convierte TODO el cuerpo en
+        # una excepcion de 'codigo': es un incumplimiento demostrable.
+        if default and (default in MONOSPACE_FONTS or default in SYMBOL_FONTS):
+            findings.append(
+                self.finding(
+                    f"La fuente del documento es '{document.default_font}'. APA 7 "
+                    "reserva las tipografías monoespaciadas y de símbolos para "
+                    "código informático, no para el cuerpo del trabajo.",
+                    location="Documento (estilo Normal)",
+                    suggestion=(
+                        "Usar una fuente legible y uniforme en todo el documento: "
+                        "12 pt Times New Roman o Aptos, 11 pt Calibri, Arial o "
+                        "Georgia, 10 pt Lucida Sans Unicode o Computer Modern."
+                    ),
+                    extra={
+                        "evidence_kind": "document_property",
+                        "property": f"estilo Normal = {document.default_font}",
+                        "font": document.default_font,
+                    },
+                )
             )
-            for name, p in seen.items()
-        ]
+
+        # Mezcla de fuentes en el cuerpo (excluidas zonas con excepcion).
+        fonts: dict[str, object] = {}
+        for p in document.body_paragraphs:
+            if p.in_table or _excluded(document, p):
+                continue
+            for name in p.fonts:
+                key = (name or "").strip().lower()
+                if not key or key in MONOSPACE_FONTS or key in SYMBOL_FONTS:
+                    continue  # codigo / simbolos: excepcion oficial
+                fonts.setdefault(key, p)
+        if len(fonts) > 1:
+            names = ", ".join(sorted(fonts))
+            first = next(iter(fonts.values()))
+            findings.append(
+                self.finding(
+                    f"El documento mezcla tipografías en el cuerpo: {names}. "
+                    "APA 7 exige usar la misma fuente en todo el trabajo.",
+                    paragraph_index=first.index,
+                    location=f"Párrafo {first.index + 1}",
+                    excerpt=first.excerpt(120),
+                    suggestion=(
+                        "Unificar la fuente en todo el documento. APA 7 admite "
+                        "cualquier fuente legible, incluida la predeterminada del "
+                        "procesador; se recomiendan 12 pt Times New Roman/Aptos, "
+                        "11 pt Calibri/Arial/Georgia o 10 pt Lucida Sans Unicode."
+                    ),
+                    extra={
+                        "evidence_kind": "document_property",
+                        "property": f"fuentes del cuerpo: {names}",
+                        "fonts": sorted(fonts),
+                    },
+                )
+            )
+        return findings
 
 
 class FontSizeRule(Rule):
@@ -99,6 +242,11 @@ class FontSizeRule(Rule):
             name="Tamaño de fuente consistente",
             category=Category.FORMATO,
             description="El cuerpo del texto debe usar un tamaño de fuente APA consistente.",
+            norm_source=FONT_URL,
+            exceptions=(
+                "8-14 pt dentro de imágenes de figuras; portada; notas al pie; "
+                "código; celdas de tabla (pueden tener otro interlineado)."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -106,7 +254,7 @@ class FontSizeRule(Rule):
         out_of_range: set[float] = set()
         first_bad: object | None = None
         for p in document.body_paragraphs:
-            if p.heading_level or p.in_table:
+            if p.heading_level or p.in_table or _excluded(document, p):
                 continue
             # Excepcion de portada/carátula: los tamaños 14/16/18 pt (o
             # superiores) se usan para la diagramacion institucional y no se
@@ -144,7 +292,7 @@ class FontSizeRule(Rule):
                     paragraph_index=first_bad.index,
                     location=f"Párrafo {first_bad.index + 1}",
                     excerpt=first_bad.excerpt(),
-                    suggestion="Usar 12 pt (o 11 pt según la fuente) de forma consistente.",
+                    suggestion="Usar 12 pt (o 11/10 pt según la fuente) de forma consistente.",
                 ),
             )
         return findings
@@ -158,6 +306,12 @@ class LineSpacingRule(Rule):
             category=Category.FORMATO,
             description="Todo el documento debe tener interlineado doble.",
             default_severity=Severity.ERROR,
+            norm_source="https://apastyle.apa.org/style-grammar-guidelines/paper-format/headings",
+            exceptions=(
+                "Portada/carátula; cuerpo de tablas (puede ser simple, 1.5 o doble); "
+                "interior de imágenes de figuras; pies de página. Los encabezados "
+                "y las citas en bloque SI deben ir a doble espacio."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -165,7 +319,7 @@ class LineSpacingRule(Rule):
         # parrafo duplicaba el mismo problema cientos de veces en una tesis
         by_value: dict[float, object] = {}
         for p in document.body_paragraphs:
-            if p.in_table:
+            if p.in_table or _excluded(document, p):
                 continue
             value = p.line_spacing
             if value is None or _approx(value, LINE_SPACING_TARGET, LINE_SPACING_TOLERANCE):
@@ -200,17 +354,21 @@ class AlignmentRule(Rule):
             name="Alineación a la izquierda",
             category=Category.FORMATO,
             description="El texto debe alinearse a la izquierda (no justificado).",
+            exceptions="Portada, títulos centrados, tablas, rotulos de figuras, citas en bloque y perfil institucional justificado.",
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
+        # Excepción institucional: si la institución solicita expresamente texto justificado
+        if getattr(document, "allow_justified", False) or getattr(document, "institutional_profile", {}).get("allow_justified", False):
+            return []
         findings: list[Finding] = []
         for p in document.body_paragraphs:
-            if p.heading_level or p.in_table:
+            if p.heading_level or p.in_table or _excluded(document, p):
                 continue
             if p.alignment in {"justify"}:
                 findings.append(
                     self.finding(
-                        f"Párrafo justificado; APA recomienda alinear a la izquierda.",
+                        "Párrafo justificado; APA recomienda alinear a la izquierda.",
                         paragraph_index=p.index,
                         location=f"Párrafo {p.index + 1}",
                         excerpt=p.excerpt(),
@@ -227,19 +385,48 @@ class FirstLineIndentRule(Rule):
             name="Sangría de primera línea",
             category=Category.FORMATO,
             description="La primera línea de cada párrafo del cuerpo debe tener sangría de 1.27 cm (0.5 in).",
+            exceptions=(
+                "Portada, resumen/abstract (sin sangría en APA 7 sec. 2.9), encabezados, listas, "
+                "citas en bloque (sangría izquierda completa de 0.5 in), "
+                "tablas, figuras, referencias (sangría francesa) y apéndices."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
         findings: list[Finding] = []
         ref_start = document.references_start
         for p in document.body_paragraphs:
-            if p.heading_level or p.is_list_item or p.in_table:
+            if p.heading_level or p.is_list_item or p.in_table or _excluded(document, p):
                 continue
             if ref_start is not None and p.index > ref_start:
                 continue
+            # Excepción normativa APA 7 sec. 2.9: el resumen / abstract va sin sangría de primera línea
+            sec_title = getattr(p, "section_title", "") or ""
+            if sec_title.strip().lower() in {"resumen", "abstract"} or getattr(p, "is_abstract", False):
+                continue
+            # Excepción normativa APA 7 sec. 8.27: citas en bloque (sangría izquierda completa)
+            if getattr(p, "is_block_quote", False) or (p.left_indent_in and p.left_indent_in >= 0.4):
+                continue
             if len(p.text.strip()) < 80:
                 continue
+
+            raw_text = p.text
+            has_manual_tab = raw_text.startswith("\t") or bool(re.match(r"^\s{4,}", raw_text))
             indent = p.first_line_indent_in
+
+            if has_manual_tab and (indent is None or indent < 0.2):
+                findings.append(
+                    self.finding(
+                        "Se detectó sangría manual con tabulador o espacios en lugar de sangría de párrafo Word.",
+                        paragraph_index=p.index,
+                        location=f"Párrafo {p.index + 1}",
+                        excerpt=p.excerpt(),
+                        suggestion="Configurar la sangría de primera línea a 1.27 cm en el estilo de párrafo y retirar tabuladores manuales.",
+                        extra={"manual_indent": True},
+                    )
+                )
+                continue
+
             if indent is None or abs(indent - INDENT_IN) > INDENT_TOLERANCE_IN:
                 shown = f"{indent:.2f} in" if indent is not None else "sin sangría"
                 findings.append(
@@ -261,6 +448,11 @@ class ParagraphSpacingRule(Rule):
             name="Sin espacio extra entre párrafos",
             category=Category.FORMATO,
             description="APA no usa espacio adicional antes o después de los párrafos.",
+            norm_source="https://apastyle.apa.org/style-grammar-guidelines/paper-format/headings",
+            exceptions=(
+                "Portada/carátula; separación entre una figura o tabla y el texto; "
+                "ajustes de maquetación de apéndices."
+            ),
         )
 
     def check(self, document: ParsedDocument) -> list[Finding]:
@@ -270,7 +462,7 @@ class ParagraphSpacingRule(Rule):
         first: object | None = None
         total = 0
         for p in document.body_paragraphs:
-            if p.in_table:
+            if p.in_table or _excluded(document, p):
                 continue
             before = p.space_before_pt or 0
             after = p.space_after_pt or 0

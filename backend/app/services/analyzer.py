@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from backend.app.rules.base import Finding, Severity
 from backend.app.rules.registry import get_rules
+from backend.app.services import precision
+from backend.app.services.comment_anchor_manager import anchor_manager
 from backend.app.services.docx_parser import ParsedDocument
 
 
@@ -15,11 +17,17 @@ class AnalysisResult:
     # avisos de la capa IA (modelo usado, notas). Se rellena cuando se fusiona la
     # revision por IA; el informe los usa para la seccion de auditoria.
     ai_notes: list[str] = field(default_factory=list)
+    # Traza del modelo PASS / FAIL / UNCERTAIN / NOT_APPLICABLE. Solo auditoria:
+    # los hallazgos descartados NO se entregan al editor ni al informe Word.
+    validation: dict = field(default_factory=dict)
+    discarded: list[Finding] = field(default_factory=list)
+    precision: dict = field(default_factory=dict)
 
 
 def analyze(document: ParsedDocument) -> AnalysisResult:
+    rules = get_rules()
     findings: list[Finding] = []
-    for rule in get_rules():
+    for rule in rules:
         try:
             findings.extend(rule.check(document))
         except Exception as exc:  # una regla no debe romper el analisis completo
@@ -30,8 +38,15 @@ def analyze(document: ParsedDocument) -> AnalysisResult:
                     severity=Severity.INFO,
                     message=f"La regla '{rule.name}' no pudo ejecutarse: {exc}",
                     location="Sistema",
+                    title=rule.name,
                 )
             )
+
+    # Puerta determinista de precision: se ejecuta SIEMPRE, sin IA y sin clave.
+    # Aqui se descartan autores inventados, fragmentos fabricados, evidencia no
+    # verificable, estados UNCERTAIN/NOT_APPLICABLE y observaciones repetidas.
+    gate = precision.finalize(document, findings, rules=rules)
+    findings = gate.kept
 
     findings.sort(key=lambda f: (f.paragraph_index if f.paragraph_index is not None else 10**9, f.rule_id))
     # Se anota en que seccion (capitulo o apartado) esta cada aviso: el
@@ -41,7 +56,17 @@ def analyze(document: ParsedDocument) -> AnalysisResult:
         section = document.section_title(f.paragraph_index)
         if section:
             f.extra["section"] = section
-    result = AnalysisResult(filename=document.filename, findings=findings)
+        if f.anchor is None and f.paragraph_index is not None and 0 <= f.paragraph_index < len(document.paragraphs):
+            p = document.paragraphs[f.paragraph_index]
+            anc = anchor_manager.create_anchor(p, f.excerpt or p.text[:80])
+            f.anchor = anc.model_dump()
+    result = AnalysisResult(
+        filename=document.filename,
+        findings=findings,
+        validation=gate.ledger.to_dict(),
+        discarded=gate.discarded,
+        precision=gate.to_dict(),
+    )
     result.summary = build_summary(document, findings)
     return result
 

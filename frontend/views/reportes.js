@@ -19,6 +19,20 @@ const SEV_PRIO = { error: "Alta", warning: "Media", info: "Baja" };
 
 const POR_PAGINA = 6;
 
+const AUTO_FIXABLE_RULES = new Set([
+  "FORMAT-001",
+  "FORMAT-004",
+  "FORMAT-005",
+  "FORMAT-006",
+  "FORMAT-007",
+  "CIT-002",
+  "CIT-003",
+  "REF-002",
+  "REF-003",
+  "REF-006",
+  "HEAD-002",
+]);
+
 let root = null;
 let app = null;
 let filtro = "all";
@@ -388,10 +402,22 @@ function mount(el) {
       const f = lista[i];
       if (!f) return;
       if (b.dataset.act === "corregir") {
-        if (app && app.openFixModal) app.openFixModal();
+        if (AUTO_FIXABLE_RULES.has(f.rule_id)) {
+          if (app && app.openFixModal) app.openFixModal();
+        } else {
+          if (app && app.toast) {
+            app.toast("Este hallazgo requiere edición manual en el documento.", "info");
+          }
+          if (app && app.jumpToFinding) app.jumpToFinding(f);
+        }
       } else if (b.dataset.act === "descartar") {
-        if (app && app.toast) app.toast("Hallazgo descartado", "ok");
-        document.getElementById(`rv-pop-${i}`).hidden = true;
+        if (app && app.discardFinding) {
+          app.discardFinding(f);
+        } else if (app && app.toast) {
+          app.toast("Hallazgo descartado", "ok");
+        }
+        const pop = el.querySelector(`#rv-pop-${i}`);
+        if (pop) pop.hidden = true;
       }
     })
   );

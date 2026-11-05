@@ -120,6 +120,59 @@ def check_citas() -> None:
     print(f"            reglas: {', '.join(sorted(rule_ids))}")
 
 
+def check_guard() -> None:
+    """Verificacion textual determinista: no se cuelan autores inventados."""
+    from backend.app.rules.base import Category, Finding, Severity
+    from backend.app.services.citation_guard import verify
+
+    document = parse_docx(build_citas_sample(), "sample_citas.docx")
+    idx = next((p.index for p in document.paragraphs if "Delgado" in p.text), None)
+    assert idx is not None, "El documento de prueba debe citar a Delgado"
+
+    def obs(message, **kwargs):
+        return Finding(
+            rule_id="CRUCE-001", category=Category.CITAS,
+            severity=Severity.ERROR, message=message,
+            paragraph_index=idx, **kwargs
+        )
+
+    inventado = obs(
+        "La cita (Hadi, 2023) no tiene entrada en la lista de referencias.",
+        extra={"surname": "Hadi"},
+    )
+    inventado_sin_metadatos = obs(
+        "La cita (Hadi, 2023) no tiene entrada en la lista de referencias.",
+    )
+    inventado_con_fragmento_real = obs(
+        "La cita (Hadi, 2023) no tiene entrada en la lista de referencias.",
+        excerpt="(Delgado, 2020)",
+    )
+    real = obs(
+        "La cita (Delgado, 2020) no tiene entrada en la lista de referencias.",
+        extra={"surname": "Delgado"},
+    )
+    sin_autor = obs("Cita sin ano de publicacion.")
+
+    resultado = verify(document, [
+        inventado, inventado_sin_metadatos, inventado_con_fragmento_real,
+        real, sin_autor,
+    ])
+    assert resultado.kept == [real, sin_autor], "Solo sobreviven las observaciones verificadas"
+    assert len(resultado.discarded) == 3, "Las 3 observaciones con 'Hadi' deben descartarse"
+    assert all(
+        f.extra.get("deterministic_dismiss_reason") for f in resultado.discarded
+    ), "El descarte debe quedar motivado"
+
+    # El motor completo sigue entregando sus hallazgos de citas reales.
+    from backend.app.services.analyzer import analyze
+    result = analyze(document)
+    assert "CRUCE-001" in {f.rule_id for f in result.findings}, \
+        "La verificacion no debe borrar los CRUCE-001 legitimos"
+
+    print("[guard]     autores inventados descartados sin intervención de la IA")
+    print(f"            conservadas {len(resultado.kept)}, descartadas {len(resultado.discarded)}")
+
+
 def check_score() -> None:
     """Un documento limpio debe puntuar alto."""
     from tests.check_score import main as score_main  # noqa: E402
@@ -131,6 +184,8 @@ def main() -> int:
     check_formato()
     print()
     check_citas()
+    print()
+    check_guard()
     print()
     check_score()
     print()

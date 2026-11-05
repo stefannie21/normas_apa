@@ -40,6 +40,8 @@ class RunInfo:
     all_caps: bool = False
     small_caps: bool = False
     is_vertical: bool = False  # super/subindice: no es cuerpo de texto
+    start_offset: int = 0
+    end_offset: int = 0
 
 
 @dataclass
@@ -61,6 +63,12 @@ class ParagraphInfo:
     estimated_page: int = 1
     section_index: int = 0
     in_table: bool = False
+    # El parrafo contiene un dibujo/imagen (w:drawing, w:pict, a:blip, c:chart).
+    # Se usa para la familia FIG; un booleano basta y evita contar dos veces
+    # las copias de mc:AlternateContent / mc:Fallback.
+    has_image: bool = False
+    paragraph_id: str = ''
+    paragraph_hash: str = ''
 
     @property
     def fonts(self) -> set[str]:
@@ -111,6 +119,35 @@ class TableInfo:
     mentioned_in_text: bool = False
     rows: int = 0
     cols: int = 0
+    in_appendix: bool = False
+
+
+@dataclass
+class FigureInfo:
+    """Figura detectada en el documento (familia FIG del motor APA 7).
+
+    APA 7 (Figure setup): numero en negrita, titulo en cursiva una linea mas
+    abajo, imagen, leyenda SOLO si existe y notas SOLO si son necesarias. La
+    atribucion de derechos solo se exige cuando la figura es reproducida o
+    adaptada de otra fuente; las de elaboracion propia no la requieren.
+    """
+
+    index: int                              # orden de aparicion (1-based)
+    number: int | None = None               # numero declarado en el rotulo
+    caption_paragraph_index: int | None = None
+    caption_text: str = ""
+    number_bold: bool = False
+    title_paragraph_index: int | None = None
+    title_text: str = ""
+    title_italic: bool = False
+    has_image: bool = False
+    image_paragraph_index: int | None = None
+    attribution_kind: str = "unknown"       # own | adapted | reproduced | unknown
+    attribution_text: str = ""
+    attribution_paragraph_index: int | None = None
+    mentioned_in_text: bool = False
+    in_appendix: bool = False
+    page: int = 1
 
 
 @dataclass
@@ -125,6 +162,7 @@ class ParsedDocument:
     cover_end: int = 0
     bibliography: object | None = None
     tables: list[TableInfo] = field(default_factory=list)
+    figures: list[FigureInfo] = field(default_factory=list)
     # titulo de la seccion (encabezado) a la que pertenece cada parrafo
     section_titles: list[str] = field(default_factory=list)
 
@@ -316,6 +354,8 @@ def _runs(paragraph) -> list[RunInfo]:
         style_caps = style_small_caps = False
 
     out: list[RunInfo] = []
+    cursor = 0
+    full_text = getattr(paragraph, "text", "") or ""
     for run in paragraph.runs:
         font = run.font
         name = font.name
@@ -345,9 +385,19 @@ def _runs(paragraph) -> list[RunInfo]:
         small_caps = getattr(font, "small_caps", None)
         if small_caps is None:
             small_caps = style_small_caps
+        r_text = run.text or ""
+        pos = full_text.find(r_text, cursor) if r_text else cursor
+        if pos != -1:
+            start_off = pos
+            end_off = pos + len(r_text)
+            cursor = end_off
+        else:
+            start_off = cursor
+            end_off = cursor + len(r_text)
+            cursor = end_off
         out.append(
             RunInfo(
-                text=run.text,
+                text=r_text,
                 font_name=name,
                 font_size_pt=_pt(size),
                 bold=bool(bold),
@@ -357,6 +407,8 @@ def _runs(paragraph) -> list[RunInfo]:
                 small_caps=bool(small_caps),
                 is_vertical=bool(getattr(font, "subscript", False))
                 or bool(getattr(font, "superscript", False)),
+                start_offset=start_off,
+                end_offset=end_off,
             )
         )
     return out
@@ -370,6 +422,36 @@ def _has_page_break(paragraph) -> bool:
             return True
         for br in paragraph._p.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}br"):
             if br.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}type") == "page":
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _paragraph_has_image(paragraph) -> bool:
+    """True si el parrafo contiene una imagen, grafico o dibujo incrustado.
+
+    Se recorre el XML del parrafo (no `doc.inline_shapes`, que no ve las
+    imagenes flotantes ni los graficos). Como solo se necesita un booleano,
+    las copias de mc:AlternateContent/mc:Fallback no producen duplicados.
+    """
+    try:
+        root = paragraph._p
+    except Exception:
+        return False
+    try:
+        for node in root.iter():
+            tag = node.tag
+            if not isinstance(tag, str):
+                continue
+            if (
+                tag == W_NS + "drawing"
+                or tag == W_NS + "pict"
+                or tag == W_NS + "object"
+                or tag.endswith("}blip")
+                or tag.endswith("}imagedata")
+                or tag.endswith("}chart")
+            ):
                 return True
     except Exception:
         return False
@@ -822,6 +904,177 @@ def _extract_tables(doc: DocxDocument, paragraphs: list[ParagraphInfo], base_fon
     return tables
 
 
+FIGURE_LABEL_RE = re.compile(
+    r"^\s*(?:figura|figure|gr[aá]fico|gr[aá]fica|imagen|ilustraci[oó]n)\s*"
+    r"(?P<number>[A-Za-z]?\d+)\b[.:\-]?\s*(?P<rest>.*)$",
+    re.IGNORECASE,
+)
+APPENDIX_HEADING_RE = re.compile(
+    r"^\s*(?:anexos?|ap[eé]ndices?|append(?:ix|ices))\b", re.IGNORECASE
+)
+ADAPTED_RE = re.compile(r"\b(?:adaptado|adaptada|adapted)\s+(?:de|from)\b", re.IGNORECASE)
+REPRODUCED_RE = re.compile(
+    r"\b(?:reproducido|reproducida|reprinted|reproduced|tomado|extra[ií]do)\s+(?:de|from)\b",
+    re.IGNORECASE,
+)
+OWN_WORK_RE = re.compile(
+    r"\b(?:elaboraci[oó]n propia|elaborado por (?:el|la) autor|"
+    r"elaboraci[oó]n del autor|fuente:\s*elaboraci[oó]n|own (?:elaboration|work))\b",
+    re.IGNORECASE,
+)
+FIGURE_NOTE_RE = re.compile(r"^\s*(?:nota|note|fuente|source)\s*[:.]", re.IGNORECASE)
+
+
+def _prefix_bold(p: ParagraphInfo, end_pos: int) -> bool:
+    """Todos los runs que cubren el rotulo 'Figura N' estan en negrita."""
+    pos = 0
+    checked = False
+    for r in p.runs:
+        start, pos = pos, pos + len(r.text)
+        if start < end_pos and r.text.strip():
+            checked = True
+            if not r.bold:
+                return False
+    return checked
+
+
+def _suffix_italic(p: ParagraphInfo, start_pos: int) -> bool:
+    """Algun run del titulo (posterior al rotulo) esta en cursiva."""
+    pos = 0
+    for r in p.runs:
+        start, pos = pos, pos + len(r.text)
+        if pos > start_pos and r.text.strip() and r.italic:
+            return True
+    return False
+
+
+def _extract_figures(paragraphs: list[ParagraphInfo]) -> list[FigureInfo]:
+    """Reconoce las figuras a partir de rotulos 'Figura N' e imagenes del XML.
+
+    No exige ningun componente opcional: leyenda y notas se registran solo si
+    aparecen. La atribucion se clasifica para no pedir derechos de autor a una
+    figura de elaboracion propia.
+    """
+    if not paragraphs:
+        return []
+
+    appendix_start: int | None = None
+    for p in paragraphs:
+        if APPENDIX_HEADING_RE.match(p.text.strip()):
+            appendix_start = p.index
+
+    candidates: list[tuple[int, re.Match, ParagraphInfo]] = []
+    for p in paragraphs:
+        match = FIGURE_LABEL_RE.match(p.text.strip())
+        if match:
+            candidates.append((p.index, match, p))
+
+    figures: list[FigureInfo] = []
+    for order, (idx, match, caption) in enumerate(candidates, start=1):
+        raw = caption.text.strip()
+        number_text = match.group("number")
+        number = int(number_text) if number_text.isdigit() else None
+        rest = (match.group("rest") or "").strip()
+        label_end = match.end("number")
+        label_end = min(label_end, len(raw))
+
+        info = FigureInfo(
+            index=order,
+            number=number,
+            caption_paragraph_index=idx,
+            caption_text=raw[:200],
+            number_bold=_prefix_bold(caption, label_end),
+            in_appendix=appendix_start is not None and idx > appendix_start,
+            page=getattr(caption, "estimated_page", 1) or 1,
+        )
+
+        # Titulo: mismo parrafo tras el rotulo, o el siguiente parrafo no vacio.
+        if rest:
+            info.title_text = rest[:200]
+            info.title_paragraph_index = idx
+            info.title_italic = _suffix_italic(caption, label_end)
+        else:
+            for j in range(idx + 1, min(idx + 3, len(paragraphs))):
+                nxt = paragraphs[j]
+                if nxt.is_empty or FIGURE_LABEL_RE.match(nxt.text.strip()):
+                    continue
+                info.title_paragraph_index = j
+                info.title_text = nxt.text.strip()[:200]
+                info.title_italic = any(
+                    r.italic for r in nxt.runs if r.text.strip()
+                )
+                break
+
+        # Imagen: normalmente despues del rotulo/titulo, pero se admite que el
+        # autor la haya colocado antes (maquetacion habitual en tesis).
+        anchor = info.title_paragraph_index or idx
+        for j in range(anchor + 1, min(anchor + 7, len(paragraphs))):
+            if paragraphs[j].has_image:
+                info.has_image = True
+                info.image_paragraph_index = j
+                break
+        if not info.has_image:
+            for j in range(max(0, idx - 3), idx):
+                if paragraphs[j].has_image:
+                    info.has_image = True
+                    info.image_paragraph_index = j
+                    break
+
+        # Atribucion / notas: solo se registra lo que esta escrito.
+        search_from = (info.image_paragraph_index or anchor) + 1
+        for j in range(search_from, min(search_from + 5, len(paragraphs))):
+            text = paragraphs[j].text.strip()
+            if not text:
+                continue
+            if OWN_WORK_RE.search(text):
+                info.attribution_kind = "own"
+                info.attribution_text = text[:200]
+                info.attribution_paragraph_index = j
+                break
+            if ADAPTED_RE.search(text):
+                info.attribution_kind = "adapted"
+                info.attribution_text = text[:200]
+                info.attribution_paragraph_index = j
+                break
+            if REPRODUCED_RE.search(text):
+                info.attribution_kind = "reproduced"
+                info.attribution_text = text[:200]
+                info.attribution_paragraph_index = j
+                break
+            if FIGURE_NOTE_RE.match(text):
+                info.attribution_text = text[:200]
+                info.attribution_paragraph_index = j
+        if info.attribution_kind == "unknown" and OWN_WORK_RE.search(raw):
+            info.attribution_kind = "own"
+            info.attribution_text = raw[:200]
+            info.attribution_paragraph_index = idx
+
+        figures.append(info)
+
+    # Mencion en el texto: 'Figura N' fuera del propio bloque de la figura.
+    for info in figures:
+        if info.number is None:
+            continue
+        needle = re.compile(
+            rf"\b(?:figura|figure)\s*{info.number}\b", re.IGNORECASE
+        )
+        own_block = {
+            info.caption_paragraph_index,
+            info.title_paragraph_index,
+            info.attribution_paragraph_index,
+        }
+        for p in paragraphs:
+            if p.index in own_block or p.in_table:
+                continue
+            if FIGURE_LABEL_RE.match(p.text.strip()):
+                continue
+            if needle.search(p.text):
+                info.mentioned_in_text = True
+                break
+
+    return figures
+
+
 def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
     doc: DocxDocument = Document(BytesIO(data))
 
@@ -862,6 +1115,19 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
         if left_indent is None:
             left_indent = _inches(style_pf.left_indent)
 
+        para_id = ""
+        try:
+            para_id = paragraph._p.attrib.get(
+                "{http://schemas.microsoft.com/office/word/2010/wordml}paraId", ""
+            )
+        except Exception:
+            para_id = ""
+        import hashlib
+        if not para_id:
+            h = hashlib.sha256(text.strip().encode("utf-8")).hexdigest()[:12]
+            para_id = f"p_{i}_{h}"
+        para_hash = hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
+
         paragraphs.append(
             ParagraphInfo(
                 index=i,
@@ -880,6 +1146,9 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
                 has_page_break=_has_page_break(paragraph),
                 section_index=section_index,
                 in_table=in_table,
+                has_image=_paragraph_has_image(paragraph),
+                paragraph_id=para_id,
+                paragraph_hash=para_hash,
             )
         )
         # un sectPr dentro del parrafo cierra la seccion: el siguiente es de otra
@@ -910,6 +1179,20 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
     references_start = _find_references_start(paragraphs)
     _estimate_pages(paragraphs, sections)
 
+    # Figuras y excepcion de apendice para tablas: se calculan despues de la
+    # estimacion de paginas para que cada elemento sepa en que pagina esta.
+    figures = _extract_figures(paragraphs)
+    appendix_start = next(
+        (p.index for p in paragraphs if APPENDIX_HEADING_RE.match(p.text.strip())),
+        None,
+    )
+    for t in tables:
+        t.in_appendix = (
+            appendix_start is not None
+            and t.caption_paragraph_index is not None
+            and t.caption_paragraph_index > appendix_start
+        )
+
     parsed = ParsedDocument(
         filename=filename,
         paragraphs=paragraphs,
@@ -918,6 +1201,7 @@ def parse_docx(data: bytes, filename: str = "documento.docx") -> ParsedDocument:
         default_font_size_pt=base_size,
         references_start=references_start,
         tables=tables,
+        figures=figures,
         section_titles=section_titles,
     )
 
